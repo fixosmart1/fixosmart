@@ -1,0 +1,166 @@
+Create a complete FixoSmart smart home maintenance app for Jeddah, Saudi Arabia with TRILINGUAL support (Bangla, English, Arabic).
+
+## CORE REQUIREMENTS:
+
+### 1. 🌍 MULTI-LANGUAGE SYSTEM (CRITICAL)
+- Languages: Bangla (bn), English (en), Arabic (ar)
+- Language switcher in header that changes ALL text instantly
+- RTL support for Arabic, LTR for English/Bangla
+- Staff translation feature: When Arabic message appears, show a "Translate to Bangla" button
+- All dynamic content (services, products, bookings) must be multilingual
+
+### 2. 🏠 REGION & CURRENCY
+- Region: Jeddah only
+- Currency: SAR (Saudi Riyal) only
+- Jeddah districts dropdown: Al-Safa, Al-Hamra, Al-Rawdah, Obhur, Al-Nazlah, Al-Basateen, Al-Marwah, Al-Sharafiyah, Al-Balad
+
+### 3. 🔥 KEY FEATURES
+
+#### A. Emergency SOS Button
+- Floating red button on all pages
+- Click → Quick booking for 1-hour emergency service
+- Pre-filled: "Emergency Repair Needed" in selected language
+
+#### B. Dashboard with Jeddah Widgets
+- Weather widget showing current Jeddah temperature (API ready)
+- Prayer times widget for Jeddah (daily times)
+- Iqama expiry tracker (countdown with notification)
+- Active bookings cards
+- Staff translation tool: Arabic messages → Bangla translation
+
+#### C. Smart E-commerce Bundling
+- Products: Smart Locks, CCTV, Smart Bulbs, Smart Plugs
+- Checkbox: "Include Professional Installation (+99 SAR)"
+- Dynamic total calculator (Product Price + Installation)
+
+#### D. Booking System
+- Multi-step form:
+  - Step 1: Jeddah district selector
+  - Step 2: Date/Time picker
+  - Step 3: Contact details
+  - Step 4: WhatsApp confirmation with location share
+- All form labels in 3 languages
+
+#### E. Expat Tools (For Bangladeshi Community)
+- Currency Converter (SAR to BDT) with live rates mock
+- Iqama Expiry Tracker with push notifications
+- Prayer Times with Bangla translation option
+- Document Vault for Iqama/Passport (Supabase Storage)
+
+### 4. 📱 PAGES TO GENERATE
+
+1. **/** – Homepage
+   - Hero with 3-language text rotation
+   - SOS button
+   - Services grid (4 cards)
+   - Smart gadgets carousel
+   - Language switcher (BN/EN/AR)
+
+2. **/dashboard** – User Dashboard
+   - Weather + Prayer times
+   - Iqama countdown
+   - Active bookings
+   - Translation tool widget
+
+3. **/services** – All Services
+   - AC, Electric, Plumbing, Smart Home
+   - Prices in SAR
+   - Book now button (trilingual)
+
+4. **/products** – Smart Gadgets
+   - Grid view with images
+   - Installation checkbox
+   - Dynamic price calculation
+
+5. **/booking/[id]** – Booking Flow
+   - District dropdown (Jeddah areas)
+   - Date/time picker
+   - WhatsApp share button
+
+6. **/expat-tools** – Special Page
+   - Currency converter (SAR to BDT)
+   - Iqama manager (add/edit/delete)
+   - Prayer times with Bangla translation
+   - Document upload
+
+7. **/profile** – User Profile
+   - Login (Google/Email)
+   - Language preference
+   - Booking history
+   - Iqama expiry input
+
+### 5. 🎨 DESIGN SYSTEM
+
+**Colors:**
+- Primary Blue: #1E40AF
+- Success Green: #16A34A
+- Premium Gold: #FBBF24
+- Dark: #111827
+- Light: #F9FAFB
+
+**UI Components:**
+- Sticky header for desktop
+- Bottom navigation for mobile
+- Framer Motion animations
+- Dark/Light mode toggle
+- Loading skeletons
+- Toast notifications
+
+### 6. 🗄️ SUPABASE SETUP
+
+```sql
+-- Create all tables with multilingual support
+
+CREATE TABLE profiles (
+  id UUID REFERENCES auth.users PRIMARY KEY,
+  full_name TEXT,
+  phone TEXT,
+  language TEXT DEFAULT 'en', -- 'bn', 'en', 'ar'
+  iqama_expiry DATE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE services (
+  id SERIAL PRIMARY KEY,
+  name_bn TEXT,  -- Bangla name
+  name_en TEXT,  -- English name
+  name_ar TEXT,  -- Arabic name
+  category TEXT,
+  price_sar DECIMAL,
+  image_url TEXT
+);
+
+CREATE TABLE products (
+  id SERIAL PRIMARY KEY,
+  name_bn TEXT,
+  name_en TEXT,
+  name_ar TEXT,
+  price_sar DECIMAL,
+  installation_fee_sar DECIMAL DEFAULT 99,
+  affiliate_link TEXT,
+  image_url TEXT
+);
+
+CREATE TABLE bookings (
+  id SERIAL PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id),
+  service_id INTEGER REFERENCES services(id),
+  product_id INTEGER REFERENCES products(id),
+  booking_date DATE,
+  booking_time TIME,
+  district TEXT,
+  address TEXT,
+  status TEXT DEFAULT 'pending',
+  total_amount_sar DECIMAL,
+  language_preference TEXT DEFAULT 'en', -- User's language at booking time
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE messages (
+  id SERIAL PRIMARY KEY,
+  booking_id INTEGER REFERENCES bookings(id),
+  original_text TEXT,
+  original_language TEXT, -- 'ar', 'en'
+  translated_text TEXT,   -- Bangla translation
+  created_at TIMESTAMP DEFAULT NOW()
+);
