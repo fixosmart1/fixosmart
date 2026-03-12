@@ -1,0 +1,263 @@
+You are a senior full-stack engineer, SaaS architect, and UX designer.
+Your task is to upgrade and extend my existing application called "FixoSmart".
+IMPORTANT:
+Do NOT create a new project.
+Update the current project and extend it into a complete service marketplace platform.
+FixoSmart is a Smart Home Maintenance & Repair platform for residents and expatriates living in Jeddah, Saudi Arabia.
+The platform connects customers with technicians for home repair services and smart home installations.
+Build the platform so it can scale across Saudi Arabia in the future.
+
+TECHNOLOGY STACK
+Use modern production-ready technologies.
+Frontend:
+Next.js
+React
+TypeScript
+TailwindCSS
+Framer Motion
+Backend:
+Supabase (Auth + Postgres + Storage + Realtime)
+Architecture must be mobile-first.
+
+REGION CONFIGURATION
+Country: Saudi Arabia
+Primary City: Jeddah
+Currency: SAR
+Supported districts:
+Al-Safa
+Al-Hamra
+Al-Rawdah
+Obhur
+Al-Nazlah
+Al-Basateen
+Al-Marwah
+Database structure must support future cities such as:
+Riyadh
+Makkah
+Madinah
+Dammam
+
+MULTI-LANGUAGE SYSTEM
+Support 3 languages:
+English (en)
+Bangla (bn)
+Arabic (ar)
+Requirements:
+Language switcher in header
+Instant language switching
+Arabic uses RTL layout
+English and Bangla use LTR
+Create translation files:
+/locales/en.json
+/locales/bn.json
+/locales/ar.json
+Store language preference in user profile.
+
+AUTHENTICATION & ROLE SYSTEM
+Implement a role-based authentication system.
+All users login using a single login page.
+Login methods:
+Google login
+Email login
+Phone OTP login
+Roles:
+customer
+technician
+admin
+After login redirect based on role:
+customer → /dashboard
+technician → /technician/dashboard
+admin → /admin
+Protect routes using role-based access control.
+Customers cannot access admin pages.
+Technicians cannot access admin pages.
+
+APPLICATION STRUCTURE
+Keep everything inside the same project.
+Customer App:
+/
+homepage
+/services
+services list
+/products
+smart gadgets marketplace
+/booking
+service booking
+/dashboard
+customer dashboard
+/profile
+user profile
+/expat-tools
+expatriate utilities
+
+Technician Panel:
+/technician/dashboard
+job overview
+/technician/jobs
+manage jobs
+/technician/earnings
+income statistics
+/technician/profile
+technician account
+
+Admin Dashboard:
+/admin
+platform overview
+/admin/users
+user management
+/admin/technicians
+technician management
+/admin/bookings
+booking management
+/admin/services
+service management
+/admin/products
+product management
+/admin/analytics
+platform analytics
+
+HOMEPAGE DESIGN
+Homepage must include:
+Hero section
+Quick booking widget
+Emergency SOS repair button
+Service category grid
+Technicians available indicator
+Smart gadgets carousel
+Special offers banner
+Customer reviews
+Expat tools section
+Prayer times widget
+Maintenance subscription plans
+Use smooth animations with Framer Motion.
+
+SERVICES
+Categories:
+AC Repair
+Electrical Repair
+Plumbing
+Smart Home Installation
+CCTV Installation
+Appliance Repair
+Each service must include:
+image
+description
+price in SAR
+Book Now button
+
+PRODUCTS MARKETPLACE
+Sell smart home devices:
+Smart Lock
+CCTV Camera
+Smart Bulb
+Smart Doorbell
+Each product includes:
+price
+installation option (+99 SAR)
+affiliate purchase link
+images
+description
+Total price must update dynamically.
+
+BOOKING SYSTEM
+Booking flow:
+Select service
+Choose district
+Select date and time
+Enter address
+Show price summary
+Confirm booking
+Add a WhatsApp share button.
+
+CUSTOMER DASHBOARD
+Widgets:
+Weather in Jeddah
+Prayer times
+Active bookings
+Booking history
+Iqama expiry tracker
+Currency converter SAR → BDT
+
+TECHNICIAN SYSTEM
+Technicians can:
+View assigned jobs
+Accept or reject jobs
+Update job status
+Upload job completion photos
+Track earnings
+Job status workflow:
+Pending
+Accepted
+On the way
+Arrived
+Completed
+
+ADMIN SYSTEM
+Admin manages:
+Users
+Technicians
+Bookings
+Services
+Products
+Payments
+Analytics
+Analytics dashboard must show:
+daily bookings
+monthly revenue
+top services
+active users
+
+DATABASE (SUPABASE)
+Create tables:
+profiles
+services
+products
+bookings
+technicians
+reviews
+subscriptions
+All service and product names must support multilingual fields.
+
+MARKETING FEATURES
+Promo codes
+Referral system
+Discount campaigns
+Special offers banner
+
+AI FEATURES
+AI repair assistant chatbot
+Photo-based problem detection
+Voice booking system
+
+SECURITY
+Use Supabase authentication.
+Enable row level security.
+Implement role-based access control.
+
+DESIGN SYSTEM
+Primary Blue #1E40AF
+Success Green #16A34A
+Gold #FBBF24
+Include:
+Dark mode
+Light mode
+Bottom mobile navigation
+Smooth animations
+
+PERFORMANCE
+Implement:
+lazy loading
+image optimization
+API caching
+
+OUTPUT REQUIREMENTS
+Generate:
+Complete project structure
+Supabase SQL schema
+Localization files
+Environment variable template
+Seed data for services and products
+Deployment instructions
+The project must run using:
+npm install
+npm run dev

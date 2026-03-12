@@ -1,109 +1,288 @@
 import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
+import * as schema from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { api } from "@shared/routes";
 import { z } from "zod";
 
+// Simple session store using Map
+const sessions = new Map<string, number>(); // sessionToken -> userId
+
+function getSessionToken(req: any): string | null {
+  return req.headers['x-session-token'] || req.cookies?.session_token || null;
+}
+
+function setSession(res: any, userId: number): string {
+  const token = Math.random().toString(36).substring(2) + Date.now();
+  sessions.set(token, userId);
+  res.cookie('session_token', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
+  return token;
+}
+
+function getSessionUser(req: any): number | null {
+  const token = getSessionToken(req);
+  if (!token) return null;
+  return sessions.get(token) || null;
+}
+
 async function seedDatabase() {
-  const services = await storage.getServices();
-  if (services.length === 0) {
-    // Seed Services
+  const svc = await storage.getServices();
+  if (svc.length === 0) {
     await db.insert(schema.services).values([
-      { nameBn: "এসি মেরামত", nameEn: "AC Repair", nameAr: "إصلاح مكيفات الهواء", category: "AC", priceSar: "150", imageUrl: "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=500&h=500&fit=crop" },
-      { nameBn: "বৈদ্যুতিক কাজ", nameEn: "Electrical Work", nameAr: "أعمال كهربائية", category: "Electric", priceSar: "100", imageUrl: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=500&h=500&fit=crop" },
-      { nameBn: "প্লাম্বিং", nameEn: "Plumbing", nameAr: "سباكة", category: "Plumbing", priceSar: "120", imageUrl: "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=500&h=500&fit=crop" },
-      { nameBn: "স্মার্ট হোম সেটআপ", nameEn: "Smart Home Setup", nameAr: "إعداد المنزل الذكي", category: "Smart Home", priceSar: "200", imageUrl: "https://images.unsplash.com/photo-1558002038-1055907df827?w=500&h=500&fit=crop" },
+      { nameBn: "এসি মেরামত", nameEn: "AC Repair", nameAr: "إصلاح مكيفات الهواء", descriptionEn: "Professional AC servicing & repair for all brands", category: "AC", priceSar: "150", imageUrl: "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=600&h=400&fit=crop" },
+      { nameBn: "বৈদ্যুতিক কাজ", nameEn: "Electrical Work", nameAr: "أعمال كهربائية", descriptionEn: "Safe & certified electrical installations and repairs", category: "Electric", priceSar: "100", imageUrl: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=600&h=400&fit=crop" },
+      { nameBn: "প্লাম্বিং", nameEn: "Plumbing", nameAr: "سباكة", descriptionEn: "Full plumbing services including leak repair and pipe fitting", category: "Plumbing", priceSar: "120", imageUrl: "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=600&h=400&fit=crop" },
+      { nameBn: "স্মার্ট হোম সেটআপ", nameEn: "Smart Home Setup", nameAr: "إعداد المنزل الذكي", descriptionEn: "Complete smart home automation and device installation", category: "Smart Home", priceSar: "200", imageUrl: "https://images.unsplash.com/photo-1558002038-1055907df827?w=600&h=400&fit=crop" },
+      { nameBn: "সিসিটিভি ইনস্টলেশন", nameEn: "CCTV Installation", nameAr: "تركيب كاميرات المراقبة", descriptionEn: "Professional CCTV security camera setup for homes and businesses", category: "Security", priceSar: "250", imageUrl: "https://images.unsplash.com/photo-1557597774-9d273605dfa9?w=600&h=400&fit=crop" },
+      { nameBn: "যন্ত্রপাতি মেরামত", nameEn: "Appliance Repair", nameAr: "إصلاح الأجهزة", descriptionEn: "Washing machine, refrigerator, dishwasher repairs", category: "Appliance", priceSar: "130", imageUrl: "https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?w=600&h=400&fit=crop" },
     ]);
   }
-
-  const products = await storage.getProducts();
-  if (products.length === 0) {
-    // Seed Products
+  const prods = await storage.getProducts();
+  if (prods.length === 0) {
     await db.insert(schema.products).values([
-      { nameBn: "স্মার্ট লক", nameEn: "Smart Lock", nameAr: "قفل ذكي", priceSar: "450", installationFeeSar: "99", imageUrl: "https://images.unsplash.com/photo-1558002038-1055907df827?w=500&h=500&fit=crop" },
-      { nameBn: "সিসিটিভি ক্যামেরা", nameEn: "CCTV Camera", nameAr: "كاميرا مراقبة", priceSar: "300", installationFeeSar: "99", imageUrl: "https://images.unsplash.com/photo-1557597774-9d273605dfa9?w=500&h=500&fit=crop" },
-      { nameBn: "স্মার্ট বাল্ব", nameEn: "Smart Bulb", nameAr: "لمبة ذكية", priceSar: "50", installationFeeSar: "0", imageUrl: "https://images.unsplash.com/photo-1550989460-0adf9ea622e2?w=500&h=500&fit=crop" },
+      { nameBn: "স্মার্ট লক", nameEn: "Smart Lock", nameAr: "قفل ذكي", descriptionEn: "Fingerprint & app-controlled door lock with remote access", priceSar: "450", installationFeeSar: "99", imageUrl: "https://images.unsplash.com/photo-1558002038-1055907df827?w=500&h=500&fit=crop" },
+      { nameBn: "সিসিটিভি ক্যামেরা", nameEn: "CCTV Camera", nameAr: "كاميرا مراقبة", descriptionEn: "HD 1080p outdoor security camera with night vision & motion detection", priceSar: "300", installationFeeSar: "99", imageUrl: "https://images.unsplash.com/photo-1557597774-9d273605dfa9?w=500&h=500&fit=crop" },
+      { nameBn: "স্মার্ট বাল্ব", nameEn: "Smart Bulb", nameAr: "لمبة ذكية", descriptionEn: "Wi-Fi RGB smart bulb, app & voice controlled, 16M colors", priceSar: "50", installationFeeSar: "0", imageUrl: "https://images.unsplash.com/photo-1550989460-0adf9ea622e2?w=500&h=500&fit=crop" },
+      { nameBn: "স্মার্ট ডোরবেল", nameEn: "Smart Doorbell", nameAr: "جرس باب ذكي", descriptionEn: "Video doorbell with HD camera, two-way audio, motion alerts", priceSar: "380", installationFeeSar: "99", imageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&h=500&fit=crop" },
     ]);
+  }
+  // Seed promo codes
+  const promos = await storage.getAllPromoCodes();
+  if (promos.length === 0) {
+    await db.insert(schema.promoCodes).values([
+      { code: "WELCOME10", discountPercent: 10, maxUses: 500, expiryDate: "2027-12-31" },
+      { code: "EXPAT20", discountPercent: 20, maxUses: 200, expiryDate: "2027-06-30" },
+      { code: "JEDDAH15", discountPercent: 15, maxUses: 300, expiryDate: "2027-09-30" },
+    ]);
+  }
+  // Seed admin user
+  const adminUsers = await db.select().from(schema.users).where(eq(schema.users.role, 'admin'));
+  if (adminUsers.length === 0) {
+    const [admin] = await db.insert(schema.users).values({ fullName: "Admin", role: "admin", email: "admin@fixosmart.com" }).returning();
+    // Seed a technician
+    const [tech] = await db.insert(schema.users).values({ fullName: "Mohammed Al-Harbi", role: "technician", phone: "+966501234567" }).returning();
+    await db.insert(schema.technicians).values({ userId: tech.id, specialization: "AC", bio: "10 years experience in AC repair and maintenance", rating: "4.9", totalJobs: 127, hourlyRate: "80" });
   }
 }
 
-import { db } from "./db";
-import * as schema from "@shared/schema";
+export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
+  // Cookie parser middleware
+  app.use((req: any, res: any, next: any) => {
+    const cookieHeader = req.headers.cookie || '';
+    req.cookies = Object.fromEntries(cookieHeader.split(';').map((c: string) => {
+      const [k, ...v] = c.trim().split('=');
+      return [k, v.join('=')];
+    }).filter(([k]: [string]) => k));
+    next();
+  });
 
-export async function registerRoutes(
-  httpServer: Server,
-  app: Express
-): Promise<Server> {
-  
+  // ===== AUTH =====
+  app.get(api.auth.me.path, async (req, res) => {
+    const userId = getSessionUser(req);
+    if (!userId) return res.json(null);
+    const user = await storage.getUser(userId);
+    res.json(user || null);
+  });
+
   app.post(api.auth.login.path, async (req, res) => {
     try {
-      const input = api.auth.login.input.parse(req.body);
-      const user = await storage.getOrCreateUserByFullName(input.fullName);
-      res.status(200).json(user);
+      const { fullName, email, role } = req.body;
+      if (!fullName) return res.status(400).json({ message: "Full name is required" });
+      const user = await storage.getOrCreateUserByFullName(fullName, role || "customer", email);
+      setSession(res, user.id);
+      res.json(user);
     } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
-      }
-      res.status(500).json({ message: "Internal server error" });
+      res.status(500).json({ message: "Login failed" });
     }
   });
 
-  app.get(api.services.list.path, async (req, res) => {
-    const services = await storage.getServices();
-    res.json(services);
+  app.post(api.auth.logout.path, (req: any, res) => {
+    const token = getSessionToken(req);
+    if (token) sessions.delete(token);
+    res.clearCookie('session_token');
+    res.json({ ok: true });
   });
 
+  // ===== SERVICES =====
+  app.get(api.services.list.path, async (req, res) => {
+    res.json(await storage.getServices());
+  });
+
+  app.post(api.services.create.path, async (req, res) => {
+    const s = await storage.createService(req.body);
+    res.status(201).json(s);
+  });
+
+  app.put(api.services.update.path, async (req, res) => {
+    const s = await storage.updateService(Number(req.params.id), req.body);
+    res.json(s);
+  });
+
+  app.delete(api.services.delete.path, async (req, res) => {
+    await storage.deleteService(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  // ===== PRODUCTS =====
   app.get(api.products.list.path, async (req, res) => {
-    const products = await storage.getProducts();
-    res.json(products);
+    res.json(await storage.getProducts());
+  });
+
+  app.post(api.products.create.path, async (req, res) => {
+    const p = await storage.createProduct(req.body);
+    res.status(201).json(p);
+  });
+
+  app.put(api.products.update.path, async (req, res) => {
+    const p = await storage.updateProduct(Number(req.params.id), req.body);
+    res.json(p);
+  });
+
+  app.delete(api.products.delete.path, async (req, res) => {
+    await storage.deleteProduct(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  // ===== BOOKINGS =====
+  app.get(api.bookings.list.path, async (req, res) => {
+    const userId = getSessionUser(req);
+    const user = userId ? await storage.getUser(userId) : null;
+    if (!user) return res.json([]);
+    const myBookings = await storage.getBookings(user.role === 'customer' ? user.id : undefined);
+    res.json(myBookings);
   });
 
   app.post(api.bookings.create.path, async (req, res) => {
     try {
-      const input = api.bookings.create.input.parse(req.body);
-      const booking = await storage.createBooking(input);
-      res.status(201).json(booking);
+      const b = await storage.createBooking(req.body);
+      res.status(201).json(b);
     } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
-      }
-      res.status(500).json({ message: "Internal server error" });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      res.status(500).json({ message: "Failed to create booking" });
     }
   });
 
-  app.get(api.bookings.list.path, async (req, res) => {
-    const bookings = await storage.getBookings();
-    res.json(bookings);
+  app.patch(api.bookings.updateStatus.path, async (req, res) => {
+    const b = await storage.updateBookingStatus(Number(req.params.id), req.body.status);
+    res.json(b);
+  });
+
+  // ===== TECHNICIANS =====
+  app.get(api.technicians.list.path, async (req, res) => {
+    res.json(await storage.getTechnicians());
+  });
+
+  app.post(api.technicians.create.path, async (req, res) => {
+    const t = await storage.createTechnician(req.body);
+    res.status(201).json(t);
+  });
+
+  app.get(api.technicians.myJobs.path, async (req, res) => {
+    const userId = getSessionUser(req);
+    if (!userId) return res.json([]);
+    const tech = await storage.getTechnicianByUserId(userId);
+    if (!tech) return res.json([]);
+    res.json(await storage.getTechnicianBookings(tech.id));
+  });
+
+  app.get(api.technicians.myEarnings.path, async (req, res) => {
+    const userId = getSessionUser(req);
+    if (!userId) return res.json({ total: 0, monthly: 0, jobs: 0 });
+    const tech = await storage.getTechnicianByUserId(userId);
+    if (!tech) return res.json({ total: 0, monthly: 0, jobs: 0 });
+    const jobs = await storage.getTechnicianBookings(tech.id);
+    const completed = jobs.filter(j => j.status === 'completed');
+    const total = completed.reduce((s, j) => s + Number(j.totalAmountSar || 0), 0);
+    const thisMonth = completed.filter(j => {
+      const d = new Date(j.bookingDate);
+      const now = new Date();
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }).reduce((s, j) => s + Number(j.totalAmountSar || 0), 0);
+    res.json({ total, monthly: thisMonth, jobs: completed.length });
+  });
+
+  app.patch(api.technicians.updateJob.path, async (req, res) => {
+    const b = await storage.updateBookingStatus(Number(req.params.id), req.body.status);
+    res.json(b);
+  });
+
+  // ===== REVIEWS =====
+  app.get(api.reviews.list.path, async (req, res) => {
+    res.json(await storage.getReviews());
+  });
+
+  app.post(api.reviews.create.path, async (req, res) => {
+    const r = await storage.createReview(req.body);
+    res.status(201).json(r);
+  });
+
+  // ===== IQAMA =====
+  app.get(api.iqama.list.path, async (req, res) => {
+    const userId = getSessionUser(req);
+    res.json(await storage.getIqamaTrackers(userId || undefined));
   });
 
   app.post(api.iqama.create.path, async (req, res) => {
     try {
-      const input = api.iqama.create.input.parse(req.body);
-      const tracker = await storage.createIqamaTracker(input);
-      res.status(201).json(tracker);
+      const t = await storage.createIqamaTracker(req.body);
+      res.status(201).json(t);
     } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
-      }
-      res.status(500).json({ message: "Internal server error" });
+      res.status(400).json({ message: "Failed to create iqama record" });
     }
-  });
-
-  app.get(api.iqama.list.path, async (req, res) => {
-    const trackers = await storage.getIqamaTrackers();
-    res.json(trackers);
   });
 
   app.delete(api.iqama.delete.path, async (req, res) => {
-    const id = Number(req.params.id);
-    if (isNaN(id)) {
-      return res.status(400).json({ message: "Invalid ID" });
-    }
-    await storage.deleteIqamaTracker(id);
+    await storage.deleteIqamaTracker(Number(req.params.id));
     res.status(204).send();
   });
 
-  // Call seed in the background
+  // ===== PROMO CODES =====
+  app.post(api.promo.validate.path, async (req, res) => {
+    const promo = await storage.validatePromoCode(req.body.code);
+    if (!promo) return res.status(404).json({ message: "Invalid or expired promo code" });
+    res.json(promo);
+  });
+
+  // ===== SUBSCRIPTIONS =====
+  app.get(api.subscriptions.list.path, async (req, res) => {
+    const userId = getSessionUser(req);
+    res.json(await storage.getSubscriptions(userId || undefined));
+  });
+
+  // ===== ADMIN =====
+  app.get(api.admin.analytics.path, async (req, res) => {
+    res.json(await storage.getAnalytics());
+  });
+
+  app.get(api.admin.users.path, async (req, res) => {
+    res.json(await storage.getAllUsers());
+  });
+
+  app.patch(api.admin.updateUserRole.path, async (req, res) => {
+    const u = await storage.updateUserRole(Number(req.params.id), req.body.role);
+    res.json(u);
+  });
+
+  app.get(api.bookings.listAll.path, async (req, res) => {
+    res.json(await storage.getAllBookings());
+  });
+
+  app.get(api.technicians.listAll.path, async (req, res) => {
+    res.json(await storage.getAllTechniciansWithUsers());
+  });
+
+  app.get(api.promo.listAll.path, async (req, res) => {
+    res.json(await storage.getAllPromoCodes());
+  });
+
+  app.post(api.promo.create.path, async (req, res) => {
+    const p = await storage.createPromoCode({ ...req.body, code: req.body.code.toUpperCase() });
+    res.status(201).json(p);
+  });
+
+  // Seed in background
   seedDatabase().catch(console.error);
 
   return httpServer;

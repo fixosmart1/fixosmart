@@ -1,57 +1,106 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, buildUrl, type User, type Service, type Product, type Booking, type IqamaTracker } from "@shared/routes";
+import { api, buildUrl } from "@shared/routes";
 
-// --- AUTH HOOKS ---
+// --- AUTH ---
 export function useAuth() {
   return useQuery({
     queryKey: [api.auth.me.path],
     queryFn: async () => {
       const res = await fetch(api.auth.me.path, { credentials: "include" });
-      if (res.status === 401) return null;
-      if (!res.ok) throw new Error("Auth failed");
-      return api.auth.me.responses[200].parse(await res.json());
+      if (!res.ok) return null;
+      return res.json();
     },
     retry: false,
+    staleTime: 30000,
   });
 }
 
 export function useLogin() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (fullName: string) => {
+    mutationFn: async (data: { fullName: string; email?: string; role?: string }) => {
       const res = await fetch(api.auth.login.path, {
-        method: api.auth.login.method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullName }),
-        credentials: "include"
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data), credentials: "include"
       });
       if (!res.ok) throw new Error("Login failed");
-      return api.auth.login.responses[200].parse(await res.json());
+      return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.auth.me.path] })
+    onSuccess: () => qc.invalidateQueries({ queryKey: [api.auth.me.path] })
   });
 }
 
-// --- SERVICES & PRODUCTS ---
+export function useLogout() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      await fetch(api.auth.logout.path, { method: 'POST', credentials: "include" });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: [api.auth.me.path] })
+  });
+}
+
+// --- SERVICES ---
 export function useServices() {
   return useQuery({
     queryKey: [api.services.list.path],
-    queryFn: async () => {
-      const res = await fetch(api.services.list.path);
-      if (!res.ok) throw new Error("Failed to fetch services");
-      return api.services.list.responses[200].parse(await res.json());
-    }
+    queryFn: () => fetch(api.services.list.path).then(r => r.json())
   });
 }
 
+export function useCreateService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => fetch(api.services.create.path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), credentials: "include" }).then(r => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [api.services.list.path] })
+  });
+}
+
+export function useUpdateService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => fetch(buildUrl(api.services.update.path, { id }), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), credentials: "include" }).then(r => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [api.services.list.path] })
+  });
+}
+
+export function useDeleteService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => fetch(buildUrl(api.services.delete.path, { id }), { method: 'DELETE', credentials: "include" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [api.services.list.path] })
+  });
+}
+
+// --- PRODUCTS ---
 export function useProducts() {
   return useQuery({
     queryKey: [api.products.list.path],
-    queryFn: async () => {
-      const res = await fetch(api.products.list.path);
-      if (!res.ok) throw new Error("Failed to fetch products");
-      return api.products.list.responses[200].parse(await res.json());
-    }
+    queryFn: () => fetch(api.products.list.path).then(r => r.json())
+  });
+}
+
+export function useCreateProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => fetch(api.products.create.path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), credentials: "include" }).then(r => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [api.products.list.path] })
+  });
+}
+
+export function useUpdateProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => fetch(buildUrl(api.products.update.path, { id }), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), credentials: "include" }).then(r => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [api.products.list.path] })
+  });
+}
+
+export function useDeleteProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => fetch(buildUrl(api.products.delete.path, { id }), { method: 'DELETE', credentials: "include" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [api.products.list.path] })
   });
 }
 
@@ -59,68 +108,157 @@ export function useProducts() {
 export function useBookings() {
   return useQuery({
     queryKey: [api.bookings.list.path],
-    queryFn: async () => {
-      const res = await fetch(api.bookings.list.path, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch bookings");
-      return api.bookings.list.responses[200].parse(await res.json());
-    }
+    queryFn: () => fetch(api.bookings.list.path, { credentials: "include" }).then(r => r.json())
+  });
+}
+
+export function useAllBookings() {
+  return useQuery({
+    queryKey: [api.bookings.listAll.path],
+    queryFn: () => fetch(api.bookings.listAll.path, { credentials: "include" }).then(r => r.json())
   });
 }
 
 export function useCreateBooking() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
-      const res = await fetch(api.bookings.create.path, {
-        method: api.bookings.create.method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-        credentials: "include"
-      });
-      if (!res.ok) throw new Error("Failed to create booking");
-      return api.bookings.create.responses[201].parse(await res.json());
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.bookings.list.path] })
+    mutationFn: (data: any) => fetch(api.bookings.create.path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), credentials: "include" }).then(async r => {
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [api.bookings.list.path] })
   });
 }
 
-// --- IQAMA TRACKER ---
+export function useUpdateBookingStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) => fetch(buildUrl(api.bookings.updateStatus.path, { id }), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }), credentials: "include" }).then(r => r.json()),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: [api.bookings.list.path] }); qc.invalidateQueries({ queryKey: [api.bookings.listAll.path] }); }
+  });
+}
+
+// --- TECHNICIANS ---
+export function useTechnicians() {
+  return useQuery({
+    queryKey: [api.technicians.list.path],
+    queryFn: () => fetch(api.technicians.list.path).then(r => r.json())
+  });
+}
+
+export function useAllTechnicians() {
+  return useQuery({
+    queryKey: [api.technicians.listAll.path],
+    queryFn: () => fetch(api.technicians.listAll.path, { credentials: "include" }).then(r => r.json())
+  });
+}
+
+export function useMyJobs() {
+  return useQuery({
+    queryKey: [api.technicians.myJobs.path],
+    queryFn: () => fetch(api.technicians.myJobs.path, { credentials: "include" }).then(r => r.json())
+  });
+}
+
+export function useMyEarnings() {
+  return useQuery({
+    queryKey: [api.technicians.myEarnings.path],
+    queryFn: () => fetch(api.technicians.myEarnings.path, { credentials: "include" }).then(r => r.json())
+  });
+}
+
+export function useUpdateJob() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) => fetch(buildUrl(api.technicians.updateJob.path, { id }), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }), credentials: "include" }).then(r => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [api.technicians.myJobs.path] })
+  });
+}
+
+// --- REVIEWS ---
+export function useReviews() {
+  return useQuery({
+    queryKey: [api.reviews.list.path],
+    queryFn: () => fetch(api.reviews.list.path).then(r => r.json())
+  });
+}
+
+export function useCreateReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => fetch(api.reviews.create.path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), credentials: "include" }).then(r => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [api.reviews.list.path] })
+  });
+}
+
+// --- IQAMA ---
 export function useIqamaTrackers() {
   return useQuery({
     queryKey: [api.iqama.list.path],
-    queryFn: async () => {
-      const res = await fetch(api.iqama.list.path, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch iqama records");
-      return api.iqama.list.responses[200].parse(await res.json());
-    }
+    queryFn: () => fetch(api.iqama.list.path, { credentials: "include" }).then(r => r.json())
   });
 }
 
 export function useCreateIqamaTracker() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: any) => {
-      const res = await fetch(api.iqama.create.path, {
-        method: api.iqama.create.method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-        credentials: "include"
-      });
-      if (!res.ok) throw new Error("Failed to create iqama record");
-      return api.iqama.create.responses[201].parse(await res.json());
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.iqama.list.path] })
+    mutationFn: (data: any) => fetch(api.iqama.create.path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), credentials: "include" }).then(r => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [api.iqama.list.path] })
   });
 }
 
 export function useDeleteIqamaTracker() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: number) => {
-      const url = buildUrl(api.iqama.delete.path, { id });
-      const res = await fetch(url, { method: api.iqama.delete.method, credentials: "include" });
-      if (!res.ok) throw new Error("Failed to delete");
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [api.iqama.list.path] })
+    mutationFn: (id: number) => fetch(buildUrl(api.iqama.delete.path, { id }), { method: 'DELETE', credentials: "include" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [api.iqama.list.path] })
+  });
+}
+
+// --- PROMO ---
+export function useValidatePromo() {
+  return useMutation({
+    mutationFn: (code: string) => fetch(api.promo.validate.path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) }).then(async r => {
+      if (!r.ok) throw new Error("Invalid promo code");
+      return r.json();
+    })
+  });
+}
+
+export function useAllPromoCodes() {
+  return useQuery({
+    queryKey: [api.promo.listAll.path],
+    queryFn: () => fetch(api.promo.listAll.path, { credentials: "include" }).then(r => r.json())
+  });
+}
+
+export function useCreatePromoCode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => fetch(api.promo.create.path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), credentials: "include" }).then(r => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [api.promo.listAll.path] })
+  });
+}
+
+// --- ADMIN ---
+export function useAdminAnalytics() {
+  return useQuery({
+    queryKey: [api.admin.analytics.path],
+    queryFn: () => fetch(api.admin.analytics.path, { credentials: "include" }).then(r => r.json())
+  });
+}
+
+export function useAdminUsers() {
+  return useQuery({
+    queryKey: [api.admin.users.path],
+    queryFn: () => fetch(api.admin.users.path, { credentials: "include" }).then(r => r.json())
+  });
+}
+
+export function useUpdateUserRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, role }: { id: number; role: string }) => fetch(buildUrl(api.admin.updateUserRole.path, { id }), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }), credentials: "include" }).then(r => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [api.admin.users.path] })
   });
 }
