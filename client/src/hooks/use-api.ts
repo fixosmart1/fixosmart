@@ -34,9 +34,16 @@ export function useLogout() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      await fetch(api.auth.logout.path, { method: 'POST', credentials: "include" });
+      const res = await fetch(api.auth.logout.path, { method: 'POST', credentials: "include" });
+      if (!res.ok) throw new Error("Logout failed");
+      return res.json();
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: [api.auth.me.path] })
+    onSuccess: () => {
+      // Clear ALL cached data so protected pages show nothing after logout
+      qc.clear();
+      // Set the user to null immediately
+      qc.setQueryData([api.auth.me.path], null);
+    }
   });
 }
 

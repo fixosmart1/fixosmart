@@ -25,8 +25,12 @@ export function Profile() {
   };
 
   const handleLogout = async () => {
-    await logout.mutateAsync();
-    setLocation('/');
+    try {
+      await logout.mutateAsync();
+    } catch (_) {}
+    // Always redirect to profile/login after logout
+    setLocation('/profile');
+    window.location.href = '/profile';
   };
 
   const copyReferral = () => {

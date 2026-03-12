@@ -6,7 +6,8 @@ import { ThemeToggle } from "./ThemeToggle";
 import { useAuth } from "@/hooks/use-api";
 import {
   Home, LayoutDashboard, Wrench, ShoppingBag, UserCircle,
-  PhoneCall, Settings, Users, Calendar, Briefcase, TrendingUp, Globe
+  PhoneCall, Users, Calendar, Briefcase, TrendingUp,
+  ChevronRight
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -41,90 +42,122 @@ export function Layout({ children }: { children: ReactNode }) {
   ];
 
   const navItems = role === 'admin' ? adminNav : role === 'technician' ? technicianNav : customerNav;
-  const isAdminOrTech = role === 'admin' || role === 'technician';
+
+  const isActive = (href: string) =>
+    href === '/' ? location === '/' : location === href || location.startsWith(href + '/');
+
+  const logoHref = role === 'admin' ? '/admin' : role === 'technician' ? '/technician/dashboard' : '/';
 
   return (
-    <div className={`min-h-screen pb-20 md:pb-0 md:pt-16 ${isRtl ? 'rtl' : 'ltr'}`} dir={isRtl ? 'rtl' : 'ltr'}>
-      {/* Top Desktop Nav */}
-      <header className="fixed top-0 left-0 right-0 h-16 glass-panel z-40 hidden md:flex items-center justify-between px-8">
-        <Link href={role === 'admin' ? '/admin' : role === 'technician' ? '/technician/dashboard' : '/'}>
-          <span className="text-2xl font-bold text-primary flex items-center gap-2 cursor-pointer">
-            <Wrench className="w-6 h-6" /> FixoSmart
+    <div
+      className={`min-h-screen min-h-dvh flex flex-col ${isRtl ? 'rtl' : 'ltr'}`}
+      dir={isRtl ? 'rtl' : 'ltr'}
+      style={{ overflowX: 'hidden' }}
+    >
+      {/* ─── Fixed Header (both mobile + desktop) ─── */}
+      <header className="fixed top-0 left-0 right-0 z-50 h-16 glass-panel flex items-center justify-between px-4 md:px-8">
+        {/* Logo */}
+        <Link href={logoHref}>
+          <span className="flex items-center gap-2 cursor-pointer select-none">
+            <div className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center">
+              <Wrench className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-lg font-bold text-primary">FixoSmart</span>
             {role !== 'customer' && (
-              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider ml-1 ${
-                role === 'admin' ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'
+              <span className={`hidden sm:inline text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                role === 'admin'
+                  ? 'bg-destructive/10 text-destructive'
+                  : 'bg-primary/10 text-primary'
               }`}>{role}</span>
             )}
           </span>
         </Link>
-        <nav className="flex items-center gap-5">
-          {navItems.map((item) => {
-            const active = location === item.href || (item.href !== '/' && location.startsWith(item.href));
-            return (
-              <Link key={item.href} href={item.href}>
-                <span className={`text-sm font-medium transition-colors cursor-pointer ${
-                  active ? 'text-primary font-semibold' : 'text-muted-foreground hover:text-foreground'
-                }`}>{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-          <LanguageSwitcher />
-        </div>
-      </header>
 
-      {/* Mobile Header */}
-      <header className="fixed top-0 left-0 right-0 h-16 glass-panel z-40 flex md:hidden items-center justify-between px-4">
-        <Link href={role === 'admin' ? '/admin' : role === 'technician' ? '/technician/dashboard' : '/'}>
-          <span className="text-lg font-bold text-primary flex items-center gap-1 cursor-pointer">
-            <Wrench className="w-5 h-5" /> FixoSmart
-          </span>
-        </Link>
+        {/* Desktop Nav Links */}
+        <nav className="hidden md:flex items-center gap-1">
+          {navItems.map((item) => (
+            <Link key={item.href} href={item.href}>
+              <span className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                isActive(item.href)
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}>
+                <item.icon size={15} />
+                {item.label}
+              </span>
+            </Link>
+          ))}
+        </nav>
+
+        {/* Right Controls */}
         <div className="flex items-center gap-2">
           <ThemeToggle />
           <LanguageSwitcher />
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8">
-        <motion.div
-          key={location}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.25 }}
+      {/* ─── Main Scroll Area ─── */}
+      {/* pt-16 = header height; pb-24 = bottom nav on mobile; md:pb-0 = no bottom nav on desktop */}
+      <div className="flex-1 pt-16 pb-24 md:pb-6 overflow-y-auto">
+        <main
+          className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4"
+          style={{ minHeight: 'calc(100dvh - 4rem)' }}
         >
-          {children}
-        </motion.div>
-      </main>
+          <motion.div
+            key={location}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {children}
+          </motion.div>
+        </main>
+      </div>
 
-      {/* SOS FAB — only for customers */}
+      {/* ─── SOS Floating Button (customers only) ─── */}
       {role === 'customer' && (
         <Link href="/booking?type=emergency">
-          <div className="fixed bottom-24 md:bottom-8 right-6 z-50 flex items-center justify-center w-16 h-16 bg-destructive text-destructive-foreground rounded-full shadow-2xl sos-pulse cursor-pointer hover:scale-105 transition-transform select-none">
-            <PhoneCall size={26} />
+          <div
+            className="fixed z-50 flex items-center justify-center w-14 h-14 bg-destructive text-white rounded-full shadow-2xl sos-pulse cursor-pointer active:scale-95 transition-transform select-none"
+            style={{
+              bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px) + 0.5rem)',
+              right: '1rem',
+            }}
+          >
+            <PhoneCall size={22} />
           </div>
         </Link>
       )}
 
-      {/* Bottom Mobile Nav */}
-      <nav className="fixed bottom-0 left-0 right-0 h-20 glass-panel z-40 flex md:hidden items-end justify-around px-2 pb-safe">
-        {navItems.slice(0, 5).map((item) => {
-          const active = location === item.href || (item.href !== '/' && location.startsWith(item.href));
-          return (
-            <Link key={item.href} href={item.href}>
-              <div className={`flex flex-col items-center gap-1 py-2 px-3 rounded-xl cursor-pointer transition-all ${
-                active ? 'text-primary' : 'text-muted-foreground'
-              }`}>
-                <item.icon size={active ? 24 : 22} strokeWidth={active ? 2.5 : 2} />
-                <span className="text-[10px] font-medium leading-none">{item.label}</span>
-              </div>
-            </Link>
-          );
-        })}
+      {/* ─── Bottom Mobile Nav ─── */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-40 flex md:hidden bg-card/95 backdrop-blur border-t border-border"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
+        <div className="flex w-full items-stretch">
+          {navItems.slice(0, 5).map((item) => {
+            const active = isActive(item.href);
+            return (
+              <Link key={item.href} href={item.href} className="flex-1">
+                <div className={`flex flex-col items-center justify-center gap-0.5 py-2 px-1 cursor-pointer transition-all min-h-[56px] ${
+                  active ? 'text-primary' : 'text-muted-foreground active:text-foreground'
+                }`}>
+                  <item.icon
+                    size={20}
+                    strokeWidth={active ? 2.5 : 1.8}
+                    className={active ? 'text-primary' : ''}
+                  />
+                  <span className={`text-[9px] font-medium leading-tight text-center ${active ? 'text-primary' : ''}`}>
+                    {item.label}
+                  </span>
+                  {active && (
+                    <div className="w-1 h-1 bg-primary rounded-full mt-0.5" />
+                  )}
+                </div>
+              </Link>
+            );
+          })}
+        </div>
       </nav>
     </div>
   );
