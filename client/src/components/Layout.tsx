@@ -6,8 +6,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { useAuth } from "@/hooks/use-api";
 import {
   Home, LayoutDashboard, Wrench, ShoppingBag, UserCircle,
-  PhoneCall, Users, Calendar, Briefcase, TrendingUp,
-  ChevronRight
+  PhoneCall, Users, Calendar, Briefcase, TrendingUp
 } from "lucide-react";
 import { motion } from "framer-motion";
 

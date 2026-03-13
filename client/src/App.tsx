@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@/hooks/use-api";
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 
 import { LanguageProvider } from "./hooks/use-language";
 import { Layout } from "./components/Layout";
@@ -33,30 +33,36 @@ import { TechnicianEarnings } from "./pages/technician/TechnicianEarnings";
 
 // ─── Route Guards ───────────────────────────────────────────────────────────
 
+function Spinner() {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
 function RequireAuth({ children, allowedRoles }: { children: ReactNode; allowedRoles?: string[] }) {
   const { data: user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const roleHome = (role?: string) =>
+    role === 'admin' ? '/admin' : role === 'technician' ? '/technician/dashboard' : '/';
 
-  if (!user) {
-    // Not logged in → go to profile/login
-    setLocation('/profile');
-    return null;
-  }
+  // Use useEffect for navigation — never call setLocation during render
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) {
+      setLocation('/profile');
+      return;
+    }
+    if (allowedRoles && !allowedRoles.includes(user.role || 'customer')) {
+      setLocation(roleHome(user.role));
+    }
+  }, [user, isLoading]);
 
-  if (allowedRoles && !allowedRoles.includes(user.role || 'customer')) {
-    // Wrong role → redirect to their home
-    const home = user.role === 'admin' ? '/admin' : user.role === 'technician' ? '/technician/dashboard' : '/';
-    setLocation(home);
-    return null;
-  }
+  if (isLoading) return <Spinner />;
+  if (!user) return <Spinner />;
+  if (allowedRoles && !allowedRoles.includes(user.role || 'customer')) return <Spinner />;
 
   return <>{children}</>;
 }
