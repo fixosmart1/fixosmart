@@ -1,0 +1,173 @@
+You are acting as a CTO, senior software architect, and debugging specialist.
+
+Your task is to completely audit, debug, optimize, and stabilize my Fixosmart application so it behaves like a production-ready SaaS platform.
+
+Before making any changes, scan and understand the entire repository.
+
+---
+
+## STEP 1 — Full Repository Analysis
+
+Analyze the entire project structure.
+
+Identify:
+
+* Framework and language used (React, Node.js, Express, PHP, etc.)
+* Frontend structure
+* Backend structure
+* Database integration
+* Authentication system
+* Admin panel implementation
+* Routing structure
+* API architecture
+
+Then generate a short technical summary explaining how the application works.
+
+---
+
+## STEP 2 — Detect Critical Problems
+
+Find and list all major problems including:
+
+* Mobile UI breaking or layout shifting
+* Console errors
+* Backend errors
+* Broken routes
+* Authentication problems
+* API failures
+* Dependency issues
+* Security vulnerabilities
+* Performance bottlenecks
+* Incorrect component structure
+* Bad state management
+* CSS conflicts
+
+Explain each problem clearly.
+
+---
+
+## STEP 3 — Mobile Responsiveness Repair
+
+The application has a mobile UI issue where the page content appears pushed upward or misaligned.
+
+Fix the layout so it works properly on mobile devices.
+
+Check:
+
+* viewport meta configuration
+* container widths
+* CSS positioning
+* fixed heights
+* overflow settings
+* margin/padding conflicts
+
+Ensure the UI works smoothly on:
+
+* phones
+* tablets
+* desktops
+
+Use modern responsive techniques:
+
+* Flexbox
+* CSS Grid
+* mobile-first layout
+* responsive breakpoints
+
+---
+
+## STEP 4 — Build a Secure Logout System
+
+Implement a proper authentication logout system.
+
+Requirements:
+
+* Add a visible Logout button in navigation.
+* On logout:
+
+  * destroy session or JWT token
+  * clear cookies or localStorage
+  * redirect to login page
+* Prevent users from accessing protected routes after logout.
+* Ensure admin routes require authentication.
+
+---
+
+## STEP 5 — Admin Panel Engineering Review
+
+Audit the entire admin panel.
+
+Verify:
+
+* dashboard functionality
+* navigation system
+* CRUD operations
+* database connections
+* form validation
+* API requests
+* loading states
+* error handling
+
+Fix any broken logic or UI problems.
+
+---
+
+## STEP 6 — Application Stability Improvements
+
+Improve the overall quality of the codebase.
+
+Check and improve:
+
+* project folder structure
+* code duplication
+* performance optimization
+* component reuse
+* API error handling
+* logging and debugging
+* security protections
+
+Apply best practices used in production SaaS systems.
+
+---
+
+## STEP 7 — Security Review
+
+Scan for vulnerabilities including:
+
+* XSS risks
+* insecure authentication
+* unsafe API endpoints
+* missing validation
+* exposed secrets
+* improper access control
+
+Fix any vulnerabilities found.
+
+---
+
+## STEP 8 — Final Optimization
+
+Refactor the code where necessary to make it cleaner and easier to maintain.
+
+Improve:
+
+* code readability
+* modular architecture
+* performance
+* scalability
+
+---
+
+## FINAL OUTPUT
+
+Provide:
+
+1. Full list of issues found
+2. Fixed code sections
+3. Explanation of each fix
+4. Security improvements made
+5. Performance improvements made
+6. Recommendations for future scaling
+
+Important:
+Act like a real CTO reviewing a production SaaS system. Do not give generic advice. Only provide precise improvements based on the codebase.
