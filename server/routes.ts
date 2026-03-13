@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
@@ -6,8 +6,9 @@ import * as schema from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { api } from "@shared/routes";
 import { z } from "zod";
+import crypto from "crypto";
 
-// Simple session store using Map
+// Cryptographically secure session store
 const sessions = new Map<string, number>(); // sessionToken -> userId
 
 function getSessionToken(req: any): string | null {
@@ -15,9 +16,9 @@ function getSessionToken(req: any): string | null {
 }
 
 function setSession(res: any, userId: number): string {
-  const token = Math.random().toString(36).substring(2) + Date.now();
+  const token = crypto.randomBytes(32).toString('hex');
   sessions.set(token, userId);
-  res.cookie('session_token', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
+  res.cookie('session_token', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
   return token;
 }
 
@@ -26,6 +27,32 @@ function getSessionUser(req: any): number | null {
   if (!token) return null;
   return sessions.get(token) || null;
 }
+
+// ─── Auth Middleware ──────────────────────────────────────────────────────────
+
+async function requireAuth(req: any, res: Response, next: NextFunction) {
+  const userId = getSessionUser(req);
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+  const user = await storage.getUser(userId);
+  if (!user) return res.status(401).json({ message: "Unauthorized" });
+  req.currentUser = user;
+  next();
+}
+
+function requireRole(...roles: string[]) {
+  return async (req: any, res: Response, next: NextFunction) => {
+    const userId = getSessionUser(req);
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const user = await storage.getUser(userId);
+    if (!user || !roles.includes(user.role || 'customer')) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    req.currentUser = user;
+    next();
+  };
+}
+
+// ─── Seeding ──────────────────────────────────────────────────────────────────
 
 async function seedDatabase() {
   const svc = await storage.getServices();
@@ -48,7 +75,6 @@ async function seedDatabase() {
       { nameBn: "স্মার্ট ডোরবেল", nameEn: "Smart Doorbell", nameAr: "جرس باب ذكي", descriptionEn: "Video doorbell with HD camera, two-way audio, motion alerts", priceSar: "380", installationFeeSar: "99", imageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&h=500&fit=crop" },
     ]);
   }
-  // Seed promo codes
   const promos = await storage.getAllPromoCodes();
   if (promos.length === 0) {
     await db.insert(schema.promoCodes).values([
@@ -57,15 +83,15 @@ async function seedDatabase() {
       { code: "JEDDAH15", discountPercent: 15, maxUses: 300, expiryDate: "2027-09-30" },
     ]);
   }
-  // Seed admin user
   const adminUsers = await db.select().from(schema.users).where(eq(schema.users.role, 'admin'));
   if (adminUsers.length === 0) {
-    const [admin] = await db.insert(schema.users).values({ fullName: "Admin", role: "admin", email: "admin@fixosmart.com" }).returning();
-    // Seed a technician
+    await db.insert(schema.users).values({ fullName: "Admin", role: "admin", email: "admin@fixosmart.com" }).returning();
     const [tech] = await db.insert(schema.users).values({ fullName: "Mohammed Al-Harbi", role: "technician", phone: "+966501234567" }).returning();
     await db.insert(schema.technicians).values({ userId: tech.id, specialization: "AC", bio: "10 years experience in AC repair and maintenance", rating: "4.9", totalJobs: 127, hourlyRate: "80" });
   }
 }
+
+// ─── Routes ───────────────────────────────────────────────────────────────────
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   // Cookie parser middleware
@@ -90,7 +116,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const { fullName, email, role } = req.body;
       if (!fullName) return res.status(400).json({ message: "Full name is required" });
-      const user = await storage.getOrCreateUserByFullName(fullName, role || "customer", email);
+      // Never allow self-assigning admin role — new accounts always default to customer
+      const safeRole = role === 'technician' ? 'technician' : 'customer';
+      const user = await storage.getOrCreateUserByFullName(fullName, safeRole, email);
       setSession(res, user.id);
       res.json(user);
     } catch (err) {
@@ -105,56 +133,54 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ ok: true });
   });
 
-  // ===== SERVICES =====
+  // ===== SERVICES (public reads, admin writes) =====
   app.get(api.services.list.path, async (req, res) => {
     res.json(await storage.getServices());
   });
 
-  app.post(api.services.create.path, async (req, res) => {
+  app.post(api.services.create.path, requireRole('admin'), async (req, res) => {
     const s = await storage.createService(req.body);
     res.status(201).json(s);
   });
 
-  app.put(api.services.update.path, async (req, res) => {
+  app.put(api.services.update.path, requireRole('admin'), async (req, res) => {
     const s = await storage.updateService(Number(req.params.id), req.body);
     res.json(s);
   });
 
-  app.delete(api.services.delete.path, async (req, res) => {
+  app.delete(api.services.delete.path, requireRole('admin'), async (req, res) => {
     await storage.deleteService(Number(req.params.id));
     res.status(204).send();
   });
 
-  // ===== PRODUCTS =====
+  // ===== PRODUCTS (public reads, admin writes) =====
   app.get(api.products.list.path, async (req, res) => {
     res.json(await storage.getProducts());
   });
 
-  app.post(api.products.create.path, async (req, res) => {
+  app.post(api.products.create.path, requireRole('admin'), async (req, res) => {
     const p = await storage.createProduct(req.body);
     res.status(201).json(p);
   });
 
-  app.put(api.products.update.path, async (req, res) => {
+  app.put(api.products.update.path, requireRole('admin'), async (req, res) => {
     const p = await storage.updateProduct(Number(req.params.id), req.body);
     res.json(p);
   });
 
-  app.delete(api.products.delete.path, async (req, res) => {
+  app.delete(api.products.delete.path, requireRole('admin'), async (req, res) => {
     await storage.deleteProduct(Number(req.params.id));
     res.status(204).send();
   });
 
   // ===== BOOKINGS =====
-  app.get(api.bookings.list.path, async (req, res) => {
-    const userId = getSessionUser(req);
-    const user = userId ? await storage.getUser(userId) : null;
-    if (!user) return res.json([]);
+  app.get(api.bookings.list.path, requireAuth, async (req: any, res) => {
+    const user = req.currentUser;
     const myBookings = await storage.getBookings(user.role === 'customer' ? user.id : undefined);
     res.json(myBookings);
   });
 
-  app.post(api.bookings.create.path, async (req, res) => {
+  app.post(api.bookings.create.path, requireAuth, async (req, res) => {
     try {
       const b = await storage.createBooking(req.body);
       res.status(201).json(b);
@@ -164,33 +190,29 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.patch(api.bookings.updateStatus.path, async (req, res) => {
+  app.patch(api.bookings.updateStatus.path, requireRole('admin', 'technician'), async (req, res) => {
     const b = await storage.updateBookingStatus(Number(req.params.id), req.body.status);
     res.json(b);
   });
 
-  // ===== TECHNICIANS =====
+  // ===== TECHNICIANS (public read, auth writes) =====
   app.get(api.technicians.list.path, async (req, res) => {
     res.json(await storage.getTechnicians());
   });
 
-  app.post(api.technicians.create.path, async (req, res) => {
+  app.post(api.technicians.create.path, requireRole('admin'), async (req, res) => {
     const t = await storage.createTechnician(req.body);
     res.status(201).json(t);
   });
 
-  app.get(api.technicians.myJobs.path, async (req, res) => {
-    const userId = getSessionUser(req);
-    if (!userId) return res.json([]);
-    const tech = await storage.getTechnicianByUserId(userId);
+  app.get(api.technicians.myJobs.path, requireRole('technician', 'admin'), async (req: any, res) => {
+    const tech = await storage.getTechnicianByUserId(req.currentUser.id);
     if (!tech) return res.json([]);
     res.json(await storage.getTechnicianBookings(tech.id));
   });
 
-  app.get(api.technicians.myEarnings.path, async (req, res) => {
-    const userId = getSessionUser(req);
-    if (!userId) return res.json({ total: 0, monthly: 0, jobs: 0 });
-    const tech = await storage.getTechnicianByUserId(userId);
+  app.get(api.technicians.myEarnings.path, requireRole('technician', 'admin'), async (req: any, res) => {
+    const tech = await storage.getTechnicianByUserId(req.currentUser.id);
     if (!tech) return res.json({ total: 0, monthly: 0, jobs: 0 });
     const jobs = await storage.getTechnicianBookings(tech.id);
     const completed = jobs.filter(j => j.status === 'completed');
@@ -203,7 +225,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ total, monthly: thisMonth, jobs: completed.length });
   });
 
-  app.patch(api.technicians.updateJob.path, async (req, res) => {
+  app.patch(api.technicians.updateJob.path, requireRole('technician', 'admin'), async (req, res) => {
     const b = await storage.updateBookingStatus(Number(req.params.id), req.body.status);
     res.json(b);
   });
@@ -213,18 +235,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(await storage.getReviews());
   });
 
-  app.post(api.reviews.create.path, async (req, res) => {
+  app.post(api.reviews.create.path, requireAuth, async (req, res) => {
     const r = await storage.createReview(req.body);
     res.status(201).json(r);
   });
 
   // ===== IQAMA =====
-  app.get(api.iqama.list.path, async (req, res) => {
-    const userId = getSessionUser(req);
-    res.json(await storage.getIqamaTrackers(userId || undefined));
+  app.get(api.iqama.list.path, requireAuth, async (req: any, res) => {
+    res.json(await storage.getIqamaTrackers(req.currentUser.id));
   });
 
-  app.post(api.iqama.create.path, async (req, res) => {
+  app.post(api.iqama.create.path, requireAuth, async (req, res) => {
     try {
       const t = await storage.createIqamaTracker(req.body);
       res.status(201).json(t);
@@ -233,7 +254,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.delete(api.iqama.delete.path, async (req, res) => {
+  app.delete(api.iqama.delete.path, requireAuth, async (req, res) => {
     await storage.deleteIqamaTracker(Number(req.params.id));
     res.status(204).send();
   });
@@ -246,43 +267,41 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ===== SUBSCRIPTIONS =====
-  app.get(api.subscriptions.list.path, async (req, res) => {
-    const userId = getSessionUser(req);
-    res.json(await storage.getSubscriptions(userId || undefined));
+  app.get(api.subscriptions.list.path, requireAuth, async (req: any, res) => {
+    res.json(await storage.getSubscriptions(req.currentUser.id));
   });
 
-  // ===== ADMIN =====
-  app.get(api.admin.analytics.path, async (req, res) => {
+  // ===== ADMIN-ONLY =====
+  app.get(api.admin.analytics.path, requireRole('admin'), async (req, res) => {
     res.json(await storage.getAnalytics());
   });
 
-  app.get(api.admin.users.path, async (req, res) => {
+  app.get(api.admin.users.path, requireRole('admin'), async (req, res) => {
     res.json(await storage.getAllUsers());
   });
 
-  app.patch(api.admin.updateUserRole.path, async (req, res) => {
+  app.patch(api.admin.updateUserRole.path, requireRole('admin'), async (req, res) => {
     const u = await storage.updateUserRole(Number(req.params.id), req.body.role);
     res.json(u);
   });
 
-  app.get(api.bookings.listAll.path, async (req, res) => {
+  app.get(api.bookings.listAll.path, requireRole('admin'), async (req, res) => {
     res.json(await storage.getAllBookings());
   });
 
-  app.get(api.technicians.listAll.path, async (req, res) => {
+  app.get(api.technicians.listAll.path, requireRole('admin'), async (req, res) => {
     res.json(await storage.getAllTechniciansWithUsers());
   });
 
-  app.get(api.promo.listAll.path, async (req, res) => {
+  app.get(api.promo.listAll.path, requireRole('admin'), async (req, res) => {
     res.json(await storage.getAllPromoCodes());
   });
 
-  app.post(api.promo.create.path, async (req, res) => {
+  app.post(api.promo.create.path, requireRole('admin'), async (req, res) => {
     const p = await storage.createPromoCode({ ...req.body, code: req.body.code.toUpperCase() });
     res.status(201).json(p);
   });
 
-  // Seed in background
   seedDatabase().catch(console.error);
 
   return httpServer;

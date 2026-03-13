@@ -7,7 +7,7 @@ FixoSmart is a trilingual (EN/BN/AR) smart home maintenance and repair marketpla
 - **Frontend**: React + TypeScript + TailwindCSS + Framer Motion + Wouter
 - **Backend**: Express.js + TypeScript
 - **Database**: PostgreSQL via Drizzle ORM
-- **Auth**: Simple session-based (cookie + in-memory Map)
+- **Auth**: Session-based (cookie + in-memory Map, cryptographically secure tokens via `crypto.randomBytes`)
 
 ## Architecture
 - `shared/schema.ts` — Drizzle ORM table definitions + Zod schemas
@@ -23,7 +23,7 @@ FixoSmart is a trilingual (EN/BN/AR) smart home maintenance and repair marketpla
 - **Technician Panel**: Dashboard, Jobs (with status workflow), Earnings
 - **Admin Dashboard**: Analytics, Users (role mgmt), Bookings (status mgmt), Services CRUD, Products CRUD
 - **Booking System**: 3-step flow, promo codes, WhatsApp share, emergency SOS mode
-- **Expat Tools**: Iqama tracker, SAR→BDT currency converter, prayer times, weather
+- **Expat Tools**: Iqama tracker (with 30-day expiry warning), SAR→BDT currency converter (1 SAR = 29.5 BDT), prayer times (5 daily with current-prayer highlight), WhatsApp share
 - **SOS Button**: Floating red button (customers only), routes to emergency booking
 - **Subscription Plans**: Basic 49 SAR, Pro 99 SAR, Elite 199 SAR
 - **Referral System**: FIXO{userId} codes shown in profile
@@ -39,6 +39,15 @@ FixoSmart is a trilingual (EN/BN/AR) smart home maintenance and repair marketpla
 
 ### Admin
 - `/admin`, `/admin/users`, `/admin/bookings`, `/admin/services`, `/admin/products`
+
+## API Security
+- Admin endpoints (`/api/admin/*`) require `role = admin` — returns 401/403 otherwise
+- Technician endpoints (`/api/technician/*`) require `role = technician | admin`
+- Booking reads/writes require valid session
+- Iqama, Subscriptions, Reviews (create) all require auth
+- Services/Products **reads** are public; writes require admin
+- Login endpoint blocks creating users with `role = admin` (only customer/technician allowed for new accounts)
+- Session tokens use `crypto.randomBytes(32)` (cryptographically secure)
 
 ## API Endpoints
 - `GET/POST /api/me` — Auth

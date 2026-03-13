@@ -90,8 +90,7 @@ export function Profile() {
               className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:border-primary outline-none transition-colors"
             >
               <option value="customer">Customer</option>
-              <option value="technician">Technician</option>
-              <option value="admin">Admin</option>
+              <option value="technician">Technician (if registered)</option>
             </select>
           </div>
           <button
@@ -104,8 +103,10 @@ export function Profile() {
           </button>
         </form>
 
-        <div className="glass p-4 rounded-2xl text-sm text-center text-muted-foreground">
-          Demo: Log in as <span className="text-primary font-medium">admin</span>, <span className="text-primary font-medium">technician</span>, or <span className="text-primary font-medium">customer</span> by selecting the role above.
+        <div className="glass p-4 rounded-2xl text-sm text-center text-muted-foreground space-y-1">
+          <p>Demo credentials — existing seeded accounts:</p>
+          <p className="font-mono text-xs">Admin: <span className="text-primary">admin@fixosmart.com</span></p>
+          <p className="font-mono text-xs">Technician: <span className="text-primary">Mohammed Al-Harbi</span></p>
         </div>
       </div>
     );
