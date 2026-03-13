@@ -9,6 +9,7 @@ import { ReactNode, useEffect } from "react";
 
 import { LanguageProvider } from "./hooks/use-language";
 import { Layout } from "./components/Layout";
+import { LoadingScreen } from "./components/LoadingScreen";
 
 // Customer Pages
 import { Home } from "./pages/Home";
@@ -31,15 +32,7 @@ import { TechnicianDashboard } from "./pages/technician/TechnicianDashboard";
 import { TechnicianJobs } from "./pages/technician/TechnicianJobs";
 import { TechnicianEarnings } from "./pages/technician/TechnicianEarnings";
 
-// ─── Route Guards ───────────────────────────────────────────────────────────
-
-function Spinner() {
-  return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
-}
+// ─── Route Guards ────────────────────────────────────────────────────────────
 
 function RequireAuth({ children, allowedRoles }: { children: ReactNode; allowedRoles?: string[] }) {
   const { data: user, isLoading } = useAuth();
@@ -48,7 +41,6 @@ function RequireAuth({ children, allowedRoles }: { children: ReactNode; allowedR
   const roleHome = (role?: string) =>
     role === 'admin' ? '/admin' : role === 'technician' ? '/technician/dashboard' : '/';
 
-  // Use useEffect for navigation — never call setLocation during render
   useEffect(() => {
     if (isLoading) return;
     if (!user) {
@@ -60,14 +52,15 @@ function RequireAuth({ children, allowedRoles }: { children: ReactNode; allowedR
     }
   }, [user, isLoading]);
 
-  if (isLoading) return <Spinner />;
-  if (!user) return <Spinner />;
-  if (allowedRoles && !allowedRoles.includes(user.role || 'customer')) return <Spinner />;
+  if (isLoading) return <LoadingScreen message="Verifying access..." />;
+  if (!user) return <LoadingScreen message="Redirecting to login..." />;
+  if (allowedRoles && !allowedRoles.includes(user.role || 'customer'))
+    return <LoadingScreen message="Redirecting..." />;
 
   return <>{children}</>;
 }
 
-// ─── Router ─────────────────────────────────────────────────────────────────
+// ─── Router ──────────────────────────────────────────────────────────────────
 
 function Router() {
   return (
@@ -151,7 +144,17 @@ function Router() {
   );
 }
 
-// ─── App ────────────────────────────────────────────────────────────────────
+// ─── AppInner — global auth gate ─────────────────────────────────────────────
+// Renders the full app only after the initial /api/me check resolves.
+// Prevents any blank white screen while the session cookie is being validated.
+
+function AppInner() {
+  const { isLoading } = useAuth();
+  if (isLoading) return <LoadingScreen message="Starting FixoSmart..." />;
+  return <Router />;
+}
+
+// ─── App ─────────────────────────────────────────────────────────────────────
 
 function App() {
   return (
@@ -159,7 +162,7 @@ function App() {
       <LanguageProvider>
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <AppInner />
         </TooltipProvider>
       </LanguageProvider>
     </QueryClientProvider>
