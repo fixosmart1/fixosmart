@@ -1,41 +1,74 @@
 import { useState } from "react";
 import { useLanguage } from "@/hooks/use-language";
-import { useAuth, useLogin, useLogout } from "@/hooks/use-api";
+import { useAuth, useLogin, useLogout, useUpdateProfile } from "@/hooks/use-api";
 import { useLocation } from "wouter";
-import { User, Mail, Phone, Globe, Shield, Copy, CheckCircle } from "lucide-react";
+import { User, Mail, Phone, Globe, Shield, Copy, CheckCircle, Edit2, Save, X, Camera } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
 export function Profile() {
   const { t, language, setLanguage } = useLanguage();
-  const { data: user } = useAuth();
+  const { data: user, isLoading: authLoading } = useAuth();
   const login = useLogin();
   const logout = useLogout();
+  const updateProfile = useUpdateProfile();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const [form, setForm] = useState({ fullName: "", email: "", role: "customer" });
+  const [loginForm, setLoginForm] = useState({ fullName: "", email: "", role: "customer" });
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ fullName: "", email: "", phone: "", profilePhoto: "" });
+
+  const startEdit = () => {
+    setEditForm({
+      fullName: user?.fullName || "",
+      email: user?.email || "",
+      phone: user?.phone || "",
+      profilePhoto: user?.profilePhoto || "",
+    });
+    setEditing(true);
+  };
+
+  const cancelEdit = () => setEditing(false);
+
+  const saveEdit = async () => {
+    if (!editForm.fullName.trim()) {
+      toast({ title: "Name required", variant: "destructive" });
+      return;
+    }
+    try {
+      await updateProfile.mutateAsync({
+        fullName: editForm.fullName.trim(),
+        email: editForm.email || undefined,
+        phone: editForm.phone || undefined,
+        profilePhoto: editForm.profilePhoto || undefined,
+      });
+      toast({ title: "Profile updated!", description: "Your changes have been saved." });
+      setEditing(false);
+    } catch (err: any) {
+      toast({ title: "Update failed", description: err.message, variant: "destructive" });
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.fullName.trim()) return;
-    await login.mutateAsync({ fullName: form.fullName, email: form.email || undefined, role: form.role });
-    toast({ title: "Logged in!", description: `Welcome, ${form.fullName}` });
+    if (!loginForm.fullName.trim()) return;
+    try {
+      const u = await login.mutateAsync({ fullName: loginForm.fullName, email: loginForm.email || undefined, role: loginForm.role });
+      toast({ title: "Logged in!", description: `Welcome, ${u.fullName}` });
+    } catch (err: any) {
+      toast({ title: "Login failed", description: err.message, variant: "destructive" });
+    }
   };
 
   const handleLogout = async () => {
-    try {
-      await logout.mutateAsync();
-    } catch (_) {}
-    // Always redirect to profile/login after logout
-    setLocation('/profile');
+    try { await logout.mutateAsync(); } catch (_) {}
     window.location.href = '/profile';
   };
 
   const copyReferral = () => {
-    const code = `FIXO${user?.id || ''}`;
-    navigator.clipboard.writeText(code);
+    navigator.clipboard.writeText(`FIXO${user?.id || ''}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -46,9 +79,13 @@ export function Profile() {
     admin: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
   };
 
+  if (authLoading) {
+    return <div className="max-w-md mx-auto mt-12 space-y-4">{[1,2,3].map(i => <div key={i} className="glass rounded-2xl h-20 animate-pulse" />)}</div>;
+  }
+
   if (!user) {
     return (
-      <div className="max-w-md mx-auto mt-8 space-y-6">
+      <div className="max-w-md mx-auto mt-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="text-center">
           <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <User size={36} className="text-primary" />
@@ -63,8 +100,8 @@ export function Profile() {
             <input
               data-testid="input-fullname"
               type="text"
-              value={form.fullName}
-              onChange={e => setForm({ ...form, fullName: e.target.value })}
+              value={loginForm.fullName}
+              onChange={e => setLoginForm({ ...loginForm, fullName: e.target.value })}
               className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:border-primary outline-none transition-colors"
               placeholder="Enter your full name"
               required
@@ -75,8 +112,8 @@ export function Profile() {
             <input
               data-testid="input-email"
               type="email"
-              value={form.email}
-              onChange={e => setForm({ ...form, email: e.target.value })}
+              value={loginForm.email}
+              onChange={e => setLoginForm({ ...loginForm, email: e.target.value })}
               className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:border-primary outline-none transition-colors"
               placeholder="your@email.com"
             />
@@ -85,8 +122,8 @@ export function Profile() {
             <label className="block text-sm font-medium mb-2">{t('role')}</label>
             <select
               data-testid="select-role"
-              value={form.role}
-              onChange={e => setForm({ ...form, role: e.target.value })}
+              value={loginForm.role}
+              onChange={e => setLoginForm({ ...loginForm, role: e.target.value })}
               className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:border-primary outline-none transition-colors"
             >
               <option value="customer">Customer</option>
@@ -104,9 +141,9 @@ export function Profile() {
         </form>
 
         <div className="glass p-4 rounded-2xl text-sm text-center text-muted-foreground space-y-1">
-          <p>Demo credentials — existing seeded accounts:</p>
-          <p className="font-mono text-xs">Admin: <span className="text-primary">admin@fixosmart.com</span></p>
-          <p className="font-mono text-xs">Technician: <span className="text-primary">Mohammed Al-Harbi</span></p>
+          <p className="font-medium text-foreground">Demo seeded accounts:</p>
+          <p className="font-mono text-xs">Admin email: <span className="text-primary">admin@fixosmart.com</span></p>
+          <p className="font-mono text-xs">Technician name: <span className="text-primary">Mohammed Al-Harbi</span></p>
         </div>
       </div>
     );
@@ -115,24 +152,108 @@ export function Profile() {
   return (
     <div className="max-w-2xl mx-auto space-y-5">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+
         {/* Profile Card */}
         <div className="glass rounded-2xl p-6">
-          <div className="flex items-start gap-4">
-            <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center text-white text-2xl font-bold shrink-0">
-              {user.fullName.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl font-bold">{user.fullName}</h2>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${roleBadgeColor[user.role || 'customer']}`}>
-                  {user.role}
-                </span>
+          {!editing ? (
+            <div className="flex items-start gap-4">
+              {/* Avatar */}
+              <div className="relative shrink-0">
+                {user.profilePhoto ? (
+                  <img src={user.profilePhoto} alt={user.fullName} className="w-16 h-16 rounded-full object-cover border-2 border-primary/20" />
+                ) : (
+                  <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                    {user.fullName.charAt(0).toUpperCase()}
+                  </div>
+                )}
               </div>
-              {user.email && <p className="text-muted-foreground text-sm mt-0.5 flex items-center gap-1.5"><Mail size={13} />{user.email}</p>}
-              {user.phone && <p className="text-muted-foreground text-sm mt-0.5 flex items-center gap-1.5"><Phone size={13} />{user.phone}</p>}
-              <p className="text-muted-foreground text-xs mt-1">Member since {new Date(user.createdAt!).toLocaleDateString()}</p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-xl font-bold">{user.fullName}</h2>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${roleBadgeColor[user.role || 'customer']}`}>
+                    {user.role}
+                  </span>
+                  {user.suspended && (
+                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">SUSPENDED</span>
+                  )}
+                </div>
+                {user.email && <p className="text-muted-foreground text-sm mt-0.5 flex items-center gap-1.5"><Mail size={13} />{user.email}</p>}
+                {user.phone && <p className="text-muted-foreground text-sm mt-0.5 flex items-center gap-1.5"><Phone size={13} />{user.phone}</p>}
+                <p className="text-muted-foreground text-xs mt-1">Member since {new Date(user.createdAt!).toLocaleDateString()}</p>
+              </div>
+              <button
+                data-testid="button-edit-profile"
+                onClick={startEdit}
+                className="shrink-0 p-2 rounded-xl bg-muted hover:bg-muted/80 transition-colors"
+                title="Edit profile"
+              >
+                <Edit2 size={16} />
+              </button>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-bold text-lg">Edit Profile</h3>
+                <button onClick={cancelEdit} className="p-2 rounded-xl bg-muted hover:bg-muted/80 transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Full Name *</label>
+                <input
+                  data-testid="input-edit-fullname"
+                  type="text"
+                  value={editForm.fullName}
+                  onChange={e => setEditForm({ ...editForm, fullName: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:border-primary outline-none transition-colors"
+                  placeholder="Your full name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Email</label>
+                <input
+                  data-testid="input-edit-email"
+                  type="email"
+                  value={editForm.email}
+                  onChange={e => setEditForm({ ...editForm, email: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:border-primary outline-none transition-colors"
+                  placeholder="your@email.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Phone</label>
+                <input
+                  data-testid="input-edit-phone"
+                  type="tel"
+                  value={editForm.phone}
+                  onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:border-primary outline-none transition-colors"
+                  placeholder="+966 5X XXX XXXX"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5 flex items-center gap-1.5"><Camera size={14} /> Profile Photo URL</label>
+                <input
+                  data-testid="input-edit-photo"
+                  type="url"
+                  value={editForm.profilePhoto}
+                  onChange={e => setEditForm({ ...editForm, profilePhoto: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:border-primary outline-none transition-colors"
+                  placeholder="https://example.com/photo.jpg"
+                />
+              </div>
+
+              <button
+                data-testid="button-save-profile"
+                onClick={saveEdit}
+                disabled={updateProfile.isPending}
+                className="w-full py-3.5 bg-primary text-primary-foreground font-bold rounded-xl disabled:opacity-50 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+              >
+                <Save size={16} /> {updateProfile.isPending ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Language Preference */}
@@ -145,6 +266,7 @@ export function Profile() {
             {(['en', 'bn', 'ar'] as const).map(lang => (
               <button
                 key={lang}
+                data-testid={`button-lang-${lang}`}
                 onClick={() => setLanguage(lang)}
                 className={`px-4 py-2 rounded-xl text-sm font-medium border-2 transition-all ${
                   language === lang ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:border-primary/50'
@@ -164,10 +286,11 @@ export function Profile() {
               FIXO{user.id}
             </div>
             <button
+              data-testid="button-copy-referral"
               onClick={copyReferral}
               className="px-4 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium text-sm flex items-center gap-2"
             >
-              {copied ? <><CheckCircle size={14} />{t('copied')}</> : <><Copy size={14} />{t('copy')}</>}
+              {copied ? <><CheckCircle size={14} />Copied!</> : <><Copy size={14} />Copy</>}
             </button>
           </div>
           <p className="text-xs text-muted-foreground mt-2">Share this code — your friend gets 10% off their first booking!</p>

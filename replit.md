@@ -19,13 +19,14 @@ FixoSmart is a trilingual (EN/BN/AR) smart home maintenance and repair marketpla
 ## Key Features
 - **Multilingual**: EN / BN / AR with RTL support for Arabic
 - **Role-based auth**: customer, technician, admin — login via Profile page
-- **Customer App**: Home, Dashboard, Services, Products, Booking (3-step), Expat Tools
-- **Technician Panel**: Dashboard, Jobs (with status workflow), Earnings
-- **Admin Dashboard**: Analytics, Users (role mgmt), Bookings (status mgmt), Services CRUD, Products CRUD
-- **Booking System**: 3-step flow, promo codes, WhatsApp share, emergency SOS mode
-- **Expat Tools**: Iqama tracker (with 30-day expiry warning), SAR→BDT currency converter (1 SAR = 29.5 BDT), prayer times (5 daily with current-prayer highlight), WhatsApp share
+- **Customer App**: Home, Dashboard, Services, Products, Booking (3-step with notes+promo), Expat Tools
+- **Technician Panel**: Dashboard, Jobs (status workflow + customer info card with phone link), Earnings
+- **Admin Dashboard**: Analytics, Users (role/suspend/delete), Bookings (customer info + tech assignment), Services CRUD, Products CRUD
+- **Booking System**: 3-step flow, notes field, promo code with live discount, WhatsApp share, emergency SOS mode
+- **Expat Tools**: Iqama tracker (30-day warning), SAR→BDT converter (29.5 rate), prayer times, WhatsApp share
 - **SOS Button**: Floating red button (customers only), routes to emergency booking
-- **Subscription Plans**: Basic 49 SAR, Pro 99 SAR, Elite 199 SAR
+- **Profile Editing**: Edit name, email, phone, profile photo URL with instant save
+- **User Suspension**: Admin can suspend/unsuspend accounts; suspended users cannot log in
 - **Referral System**: FIXO{userId} codes shown in profile
 
 ## Routes

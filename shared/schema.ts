@@ -2,7 +2,7 @@ import { pgTable, text, serial, integer, numeric, date, timestamp, boolean } fro
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// USERS — extended with role
+// USERS — extended with role, suspension, profile photo
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   fullName: text("full_name").notNull(),
@@ -14,6 +14,8 @@ export const users = pgTable("users", {
   city: text("city").default("Jeddah"),
   referralCode: text("referral_code"),
   referredBy: text("referred_by"),
+  profilePhoto: text("profile_photo"),
+  suspended: boolean("suspended").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

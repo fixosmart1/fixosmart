@@ -4,7 +4,6 @@ import { storage } from "./storage";
 import { db } from "./db";
 import * as schema from "@shared/schema";
 import { eq } from "drizzle-orm";
-import { api } from "@shared/routes";
 import { z } from "zod";
 import crypto from "crypto";
 
@@ -35,6 +34,7 @@ async function requireAuth(req: any, res: Response, next: NextFunction) {
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
   const user = await storage.getUser(userId);
   if (!user) return res.status(401).json({ message: "Unauthorized" });
+  if (user.suspended) return res.status(403).json({ message: "Account suspended" });
   req.currentUser = user;
   next();
 }
@@ -47,6 +47,7 @@ function requireRole(...roles: string[]) {
     if (!user || !roles.includes(user.role || 'customer')) {
       return res.status(403).json({ message: "Forbidden" });
     }
+    if (user.suspended) return res.status(403).json({ message: "Account suspended" });
     req.currentUser = user;
     next();
   };
@@ -105,20 +106,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ===== AUTH =====
-  app.get(api.auth.me.path, async (req, res) => {
+  app.get('/api/me', async (req, res) => {
     const userId = getSessionUser(req);
     if (!userId) return res.json(null);
     const user = await storage.getUser(userId);
     res.json(user || null);
   });
 
-  app.post(api.auth.login.path, async (req, res) => {
+  app.post('/api/login', async (req, res) => {
     try {
       const { fullName, email, role } = req.body;
       if (!fullName) return res.status(400).json({ message: "Full name is required" });
-      // Never allow self-assigning admin role — new accounts always default to customer
       const safeRole = role === 'technician' ? 'technician' : 'customer';
       const user = await storage.getOrCreateUserByFullName(fullName, safeRole, email);
+      if (user.suspended) return res.status(403).json({ message: "Account suspended. Contact support." });
       setSession(res, user.id);
       res.json(user);
     } catch (err) {
@@ -126,61 +127,77 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post(api.auth.logout.path, (req: any, res) => {
+  app.post('/api/logout', (req: any, res) => {
     const token = getSessionToken(req);
     if (token) sessions.delete(token);
     res.clearCookie('session_token');
     res.json({ ok: true });
   });
 
+  // ===== PROFILE (own profile update) =====
+  app.patch('/api/profile', requireAuth, async (req: any, res) => {
+    try {
+      const { fullName, email, phone, profilePhoto } = req.body;
+      const updated = await storage.updateUser(req.currentUser.id, {
+        ...(fullName ? { fullName } : {}),
+        ...(email !== undefined ? { email } : {}),
+        ...(phone !== undefined ? { phone } : {}),
+        ...(profilePhoto !== undefined ? { profilePhoto } : {}),
+      });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
   // ===== SERVICES (public reads, admin writes) =====
-  app.get(api.services.list.path, async (req, res) => {
+  app.get('/api/services', async (req, res) => {
     res.json(await storage.getServices());
   });
 
-  app.post(api.services.create.path, requireRole('admin'), async (req, res) => {
+  app.post('/api/services', requireRole('admin'), async (req, res) => {
     const s = await storage.createService(req.body);
     res.status(201).json(s);
   });
 
-  app.put(api.services.update.path, requireRole('admin'), async (req, res) => {
+  app.put('/api/services/:id', requireRole('admin'), async (req, res) => {
     const s = await storage.updateService(Number(req.params.id), req.body);
     res.json(s);
   });
 
-  app.delete(api.services.delete.path, requireRole('admin'), async (req, res) => {
+  app.delete('/api/services/:id', requireRole('admin'), async (req, res) => {
     await storage.deleteService(Number(req.params.id));
     res.status(204).send();
   });
 
   // ===== PRODUCTS (public reads, admin writes) =====
-  app.get(api.products.list.path, async (req, res) => {
+  app.get('/api/products', async (req, res) => {
     res.json(await storage.getProducts());
   });
 
-  app.post(api.products.create.path, requireRole('admin'), async (req, res) => {
+  app.post('/api/products', requireRole('admin'), async (req, res) => {
     const p = await storage.createProduct(req.body);
     res.status(201).json(p);
   });
 
-  app.put(api.products.update.path, requireRole('admin'), async (req, res) => {
+  app.put('/api/products/:id', requireRole('admin'), async (req, res) => {
     const p = await storage.updateProduct(Number(req.params.id), req.body);
     res.json(p);
   });
 
-  app.delete(api.products.delete.path, requireRole('admin'), async (req, res) => {
+  app.delete('/api/products/:id', requireRole('admin'), async (req, res) => {
     await storage.deleteProduct(Number(req.params.id));
     res.status(204).send();
   });
 
   // ===== BOOKINGS =====
-  app.get(api.bookings.list.path, requireAuth, async (req: any, res) => {
+  app.get('/api/bookings', requireAuth, async (req: any, res) => {
     const user = req.currentUser;
     const myBookings = await storage.getBookings(user.role === 'customer' ? user.id : undefined);
     res.json(myBookings);
   });
 
-  app.post(api.bookings.create.path, requireAuth, async (req, res) => {
+  app.post('/api/bookings', requireAuth, async (req, res) => {
     try {
       const b = await storage.createBooking(req.body);
       res.status(201).json(b);
@@ -190,28 +207,28 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.patch(api.bookings.updateStatus.path, requireRole('admin', 'technician'), async (req, res) => {
+  app.patch('/api/bookings/:id/status', requireRole('admin', 'technician'), async (req, res) => {
     const b = await storage.updateBookingStatus(Number(req.params.id), req.body.status);
     res.json(b);
   });
 
   // ===== TECHNICIANS (public read, auth writes) =====
-  app.get(api.technicians.list.path, async (req, res) => {
+  app.get('/api/technicians', async (req, res) => {
     res.json(await storage.getTechnicians());
   });
 
-  app.post(api.technicians.create.path, requireRole('admin'), async (req, res) => {
+  app.post('/api/technicians', requireRole('admin'), async (req, res) => {
     const t = await storage.createTechnician(req.body);
     res.status(201).json(t);
   });
 
-  app.get(api.technicians.myJobs.path, requireRole('technician', 'admin'), async (req: any, res) => {
+  app.get('/api/technician/jobs', requireRole('technician', 'admin'), async (req: any, res) => {
     const tech = await storage.getTechnicianByUserId(req.currentUser.id);
     if (!tech) return res.json([]);
-    res.json(await storage.getTechnicianBookings(tech.id));
+    res.json(await storage.getTechnicianBookingsWithUsers(tech.id));
   });
 
-  app.get(api.technicians.myEarnings.path, requireRole('technician', 'admin'), async (req: any, res) => {
+  app.get('/api/technician/earnings', requireRole('technician', 'admin'), async (req: any, res) => {
     const tech = await storage.getTechnicianByUserId(req.currentUser.id);
     if (!tech) return res.json({ total: 0, monthly: 0, jobs: 0 });
     const jobs = await storage.getTechnicianBookings(tech.id);
@@ -225,27 +242,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ total, monthly: thisMonth, jobs: completed.length });
   });
 
-  app.patch(api.technicians.updateJob.path, requireRole('technician', 'admin'), async (req, res) => {
+  app.patch('/api/technician/jobs/:id', requireRole('technician', 'admin'), async (req, res) => {
     const b = await storage.updateBookingStatus(Number(req.params.id), req.body.status);
     res.json(b);
   });
 
   // ===== REVIEWS =====
-  app.get(api.reviews.list.path, async (req, res) => {
+  app.get('/api/reviews', async (req, res) => {
     res.json(await storage.getReviews());
   });
 
-  app.post(api.reviews.create.path, requireAuth, async (req, res) => {
+  app.post('/api/reviews', requireAuth, async (req, res) => {
     const r = await storage.createReview(req.body);
     res.status(201).json(r);
   });
 
   // ===== IQAMA =====
-  app.get(api.iqama.list.path, requireAuth, async (req: any, res) => {
+  app.get('/api/iqama', requireAuth, async (req: any, res) => {
     res.json(await storage.getIqamaTrackers(req.currentUser.id));
   });
 
-  app.post(api.iqama.create.path, requireAuth, async (req, res) => {
+  app.post('/api/iqama', requireAuth, async (req, res) => {
     try {
       const t = await storage.createIqamaTracker(req.body);
       res.status(201).json(t);
@@ -254,50 +271,71 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.delete(api.iqama.delete.path, requireAuth, async (req, res) => {
+  app.delete('/api/iqama/:id', requireAuth, async (req, res) => {
     await storage.deleteIqamaTracker(Number(req.params.id));
     res.status(204).send();
   });
 
   // ===== PROMO CODES =====
-  app.post(api.promo.validate.path, async (req, res) => {
+  app.post('/api/promo/validate', async (req, res) => {
     const promo = await storage.validatePromoCode(req.body.code);
     if (!promo) return res.status(404).json({ message: "Invalid or expired promo code" });
     res.json(promo);
   });
 
   // ===== SUBSCRIPTIONS =====
-  app.get(api.subscriptions.list.path, requireAuth, async (req: any, res) => {
+  app.get('/api/subscriptions', requireAuth, async (req: any, res) => {
     res.json(await storage.getSubscriptions(req.currentUser.id));
   });
 
   // ===== ADMIN-ONLY =====
-  app.get(api.admin.analytics.path, requireRole('admin'), async (req, res) => {
+  app.get('/api/admin/analytics', requireRole('admin'), async (req, res) => {
     res.json(await storage.getAnalytics());
   });
 
-  app.get(api.admin.users.path, requireRole('admin'), async (req, res) => {
+  app.get('/api/admin/users', requireRole('admin'), async (req, res) => {
     res.json(await storage.getAllUsers());
   });
 
-  app.patch(api.admin.updateUserRole.path, requireRole('admin'), async (req, res) => {
+  app.patch('/api/admin/users/:id/role', requireRole('admin'), async (req, res) => {
     const u = await storage.updateUserRole(Number(req.params.id), req.body.role);
     res.json(u);
   });
 
-  app.get(api.bookings.listAll.path, requireRole('admin'), async (req, res) => {
-    res.json(await storage.getAllBookings());
+  app.patch('/api/admin/users/:id/suspend', requireRole('admin'), async (req, res) => {
+    const { suspended } = req.body;
+    const u = await storage.suspendUser(Number(req.params.id), Boolean(suspended));
+    res.json(u);
   });
 
-  app.get(api.technicians.listAll.path, requireRole('admin'), async (req, res) => {
+  app.delete('/api/admin/users/:id', requireRole('admin'), async (req, res) => {
+    try {
+      await storage.deleteUser(Number(req.params.id));
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  app.get('/api/admin/bookings', requireRole('admin'), async (req, res) => {
+    res.json(await storage.getAllBookingsWithUsers());
+  });
+
+  app.patch('/api/admin/bookings/:id/assign', requireRole('admin'), async (req, res) => {
+    const { technicianId } = req.body;
+    const b = await storage.assignTechnicianToBooking(Number(req.params.id), technicianId ? Number(technicianId) : null);
+    res.json(b);
+  });
+
+  app.get('/api/admin/technicians', requireRole('admin'), async (req, res) => {
     res.json(await storage.getAllTechniciansWithUsers());
   });
 
-  app.get(api.promo.listAll.path, requireRole('admin'), async (req, res) => {
+  app.get('/api/admin/promos', requireRole('admin'), async (req, res) => {
     res.json(await storage.getAllPromoCodes());
   });
 
-  app.post(api.promo.create.path, requireRole('admin'), async (req, res) => {
+  app.post('/api/admin/promos', requireRole('admin'), async (req, res) => {
     const p = await storage.createPromoCode({ ...req.body, code: req.body.code.toUpperCase() });
     res.status(201).json(p);
   });

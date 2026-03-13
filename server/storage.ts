@@ -18,8 +18,11 @@ export interface IStorage {
   // USERS
   getUser(id: number): Promise<User | undefined>;
   getOrCreateUserByFullName(fullName: string, role?: string, email?: string): Promise<User>;
+  updateUser(id: number, data: Partial<Pick<InsertUser, 'fullName' | 'email' | 'phone' | 'profilePhoto' | 'language'>>): Promise<User>;
   getAllUsers(): Promise<User[]>;
   updateUserRole(id: number, role: string): Promise<User>;
+  suspendUser(id: number, suspended: boolean): Promise<User>;
+  deleteUser(id: number): Promise<void>;
 
   // SERVICES
   getServices(): Promise<Service[]>;
@@ -36,9 +39,12 @@ export interface IStorage {
   // BOOKINGS
   getBookings(userId?: number): Promise<Booking[]>;
   getAllBookings(): Promise<Booking[]>;
+  getAllBookingsWithUsers(): Promise<any[]>;
   createBooking(booking: InsertBooking): Promise<Booking>;
   updateBookingStatus(id: number, status: string): Promise<Booking>;
+  assignTechnicianToBooking(bookingId: number, technicianId: number | null): Promise<Booking>;
   getTechnicianBookings(technicianId: number): Promise<Booking[]>;
+  getTechnicianBookingsWithUsers(technicianId: number): Promise<any[]>;
 
   // TECHNICIANS
   getTechnicians(): Promise<Technician[]>;
@@ -82,6 +88,11 @@ export class DatabaseStorage implements IStorage {
     return u;
   }
 
+  async updateUser(id: number, data: Partial<Pick<InsertUser, 'fullName' | 'email' | 'phone' | 'profilePhoto' | 'language'>>) {
+    const [u] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return u;
+  }
+
   async getAllUsers() {
     return db.select().from(users).orderBy(desc(users.createdAt));
   }
@@ -89,6 +100,15 @@ export class DatabaseStorage implements IStorage {
   async updateUserRole(id: number, role: string) {
     const [u] = await db.update(users).set({ role }).where(eq(users.id, id)).returning();
     return u;
+  }
+
+  async suspendUser(id: number, suspended: boolean) {
+    const [u] = await db.update(users).set({ suspended }).where(eq(users.id, id)).returning();
+    return u;
+  }
+
+  async deleteUser(id: number) {
+    await db.delete(users).where(eq(users.id, id));
   }
 
   async getServices() { return db.select().from(services); }
@@ -132,6 +152,21 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(bookings).orderBy(desc(bookings.createdAt));
   }
 
+  async getAllBookingsWithUsers() {
+    const allBookings = await db.select().from(bookings).orderBy(desc(bookings.createdAt));
+    const result = [];
+    for (const b of allBookings) {
+      const customer = b.userId ? await this.getUser(b.userId) : null;
+      result.push({
+        ...b,
+        customerName: customer?.fullName || 'Guest',
+        customerPhone: customer?.phone || null,
+        customerEmail: customer?.email || null,
+      });
+    }
+    return result;
+  }
+
   async createBooking(booking: InsertBooking) {
     const [b] = await db.insert(bookings).values(booking).returning();
     return b;
@@ -142,8 +177,28 @@ export class DatabaseStorage implements IStorage {
     return b;
   }
 
+  async assignTechnicianToBooking(bookingId: number, technicianId: number | null) {
+    const [b] = await db.update(bookings).set({ technicianId }).where(eq(bookings.id, bookingId)).returning();
+    return b;
+  }
+
   async getTechnicianBookings(technicianId: number) {
     return db.select().from(bookings).where(eq(bookings.technicianId, technicianId)).orderBy(desc(bookings.createdAt));
+  }
+
+  async getTechnicianBookingsWithUsers(technicianId: number) {
+    const jobs = await db.select().from(bookings).where(eq(bookings.technicianId, technicianId)).orderBy(desc(bookings.createdAt));
+    const result = [];
+    for (const j of jobs) {
+      const customer = j.userId ? await this.getUser(j.userId) : null;
+      result.push({
+        ...j,
+        customerName: customer?.fullName || 'Guest',
+        customerPhone: customer?.phone || null,
+        customerEmail: customer?.email || null,
+      });
+    }
+    return result;
   }
 
   async getTechnicians() { return db.select().from(technicians); }

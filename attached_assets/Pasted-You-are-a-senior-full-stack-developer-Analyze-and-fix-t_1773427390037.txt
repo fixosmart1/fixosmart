@@ -1,0 +1,104 @@
+You are a senior full-stack developer. Analyze and fix the issues in my Fixosmart application.
+
+First scan the entire repository and understand how the customer, technician, and admin systems are connected before making changes.
+
+---
+
+## ISSUE 1 — Customer to Technician Task Linking
+
+Currently the technician cannot see any tasks or requests from customers.
+
+Tasks:
+
+1. Check the database structure for customer service requests.
+2. Verify that when a customer creates a task/request it is properly saved.
+3. Ensure tasks are assigned to technicians correctly.
+4. Fix the API or backend logic so technicians can see:
+
+   * customer task requests
+   * task status
+   * task details
+5. Display tasks properly in the technician dashboard.
+
+---
+
+## ISSUE 2 — Admin Panel Logout System
+
+The admin panel currently has no logout option.
+
+Tasks:
+
+1. Add a logout button to the admin panel navigation bar.
+2. When logout is clicked:
+
+   * destroy the admin session or token
+   * clear authentication storage
+   * redirect to the login page
+3. Ensure admin pages cannot be accessed after logout.
+
+---
+
+## ISSUE 3 — Admin Profile Section
+
+Add an admin profile section.
+
+Features:
+
+* show admin name
+* show admin email
+* allow editing profile information
+* optional profile photo upload
+
+Create a simple profile page accessible from the admin dashboard.
+
+---
+
+## ISSUE 4 — Customer Profile Customization
+
+Allow customers to edit their profile.
+
+Features required:
+
+* edit name
+* upload/change profile photo
+* update contact details
+* save changes to the database
+* display updated profile in the user dashboard
+
+Ensure the image upload works properly and saves the file securely.
+
+---
+
+## ISSUE 5 — UI Improvements
+
+Improve the interface so the following elements exist:
+
+Admin panel:
+
+* dashboard
+* profile
+* logout button
+
+Customer dashboard:
+
+* profile settings
+* profile photo upload
+* edit name
+
+Technician dashboard:
+
+* view assigned customer tasks
+* view task details
+* update task status
+
+---
+
+## FINAL OUTPUT
+
+Provide:
+
+1. The issues found in the code
+2. The corrected code sections
+3. Database changes if needed
+4. Explanation of fixes
+5. Ensure everything works across admin, customer, and technician dashboards.

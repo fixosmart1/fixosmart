@@ -1,0 +1,225 @@
+You are a senior full-stack architect and SaaS engineer.
+
+Your task is to analyze, repair, and complete the Fixosmart application so it functions as a full service marketplace platform connecting customers with technicians.
+
+First read and understand the entire repository before modifying anything.
+
+---
+
+## SYSTEM OVERVIEW
+
+The system has three user roles:
+
+1. Admin
+2. Customer
+3. Technician
+
+Customers should be able to create service requests.
+Technicians should receive and manage those requests.
+Admins should manage users, requests, and platform settings.
+
+---
+
+## STEP 1 — Repository Analysis
+
+Scan the entire project and identify:
+
+• Frontend framework
+• Backend framework
+• Database structure
+• Authentication method
+• API routes
+• Dashboard pages
+
+Explain the current architecture before making changes.
+
+---
+
+## STEP 2 — Database Structure
+
+Ensure the database supports the following tables or collections:
+
+Users
+
+* id
+* name
+* email
+* password
+* role (admin, customer, technician)
+* profile_photo
+* created_at
+
+ServiceRequests
+
+* id
+* customer_id
+* technician_id
+* service_type
+* description
+* status
+* created_at
+* updated_at
+
+Reviews
+
+* id
+* customer_id
+* technician_id
+* rating
+* comment
+
+---
+
+## STEP 3 — Customer Dashboard
+
+Customers must be able to:
+
+• create service request
+• see request history
+• view technician assigned
+• track request status
+• edit profile
+• upload/change profile photo
+• change name and contact info
+
+Profile changes must save to the database.
+
+---
+
+## STEP 4 — Technician Dashboard
+
+Technicians must be able to:
+
+• view assigned service requests
+• accept or reject tasks
+• update task status
+• mark job completed
+• view customer information
+• see service history
+
+Technicians must only see requests assigned to them.
+
+---
+
+## STEP 5 — Admin Panel
+
+Admin must have a complete control dashboard.
+
+Admin features:
+
+User Management
+• view customers
+• view technicians
+• suspend users
+• delete users
+
+Service Management
+• view all service requests
+• assign technician to request
+• update request status
+
+Analytics
+• total customers
+• total technicians
+• total service requests
+• completed jobs
+
+---
+
+## STEP 6 — Authentication System
+
+Implement secure login and logout.
+
+For every user role:
+
+Login
+• email and password authentication
+
+Logout
+• destroy session or JWT token
+• clear authentication storage
+• redirect to login page
+
+Protected routes must block unauthorized users.
+
+---
+
+## STEP 7 — Profile System
+
+Each user must have a profile page.
+
+Features:
+
+• view profile
+• edit name
+• upload profile image
+• save changes to database
+
+Images must be stored securely.
+
+---
+
+## STEP 8 — UI Navigation
+
+Add navigation menus for each role.
+
+Admin Navigation
+• dashboard
+• users
+• service requests
+• profile
+• logout
+
+Customer Navigation
+• dashboard
+• create request
+• request history
+• profile
+• logout
+
+Technician Navigation
+• dashboard
+• assigned tasks
+• job history
+• profile
+• logout
+
+---
+
+## STEP 9 — Mobile Responsiveness
+
+Fix layout problems on mobile devices.
+
+Ensure pages render properly on:
+
+• mobile phones
+• tablets
+• desktops
+
+Use responsive design with Flexbox or Grid.
+
+---
+
+## STEP 10 — Error Handling
+
+Add proper error handling for:
+
+• failed API calls
+• login errors
+• missing data
+• invalid inputs
+
+Display user-friendly error messages.
+
+---
+
+## FINAL OUTPUT
+
+Provide:
+
+1. List of problems found in the project
+2. Updated database schema
+3. Fixed backend logic
+4. Corrected frontend components
+5. Explanation of each improvement
+6. Ensure the application runs without errors for admin, customer, and technician users.
