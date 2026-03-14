@@ -73,7 +73,6 @@ function Router() {
         <Route path="/services" component={Services} />
         <Route path="/products" component={Products} />
         <Route path="/profile" component={Profile} />
-        <Route path="/technician/:id" component={TechnicianProfile} />
 
         {/* Protected customer pages */}
         <Route path="/dashboard">
@@ -145,6 +144,9 @@ function Router() {
             <Profile />
           </RequireAuth>
         </Route>
+
+        {/* Public technician profile — must be AFTER specific /technician/* routes */}
+        <Route path="/technician/:id" component={TechnicianProfile} />
 
         <Route component={NotFound} />
       </Switch>

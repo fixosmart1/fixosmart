@@ -1,0 +1,150 @@
+Upgrade the Fixosmart Technician Dashboard UI to a modern professional layout similar to large service marketplace apps.
+
+Do not change customer or admin dashboards. Only improve the technician dashboard interface and order management UI.
+
+First analyze how technician orders are currently displayed and then redesign the interface.
+
+====================================
+TECHNICIAN DASHBOARD LAYOUT
+===========================
+
+Create a clean modern dashboard layout.
+
+Top Header
+
+* technician profile photo
+* technician name
+* notification icon
+* logout button
+
+Stats Summary Row
+Display quick statistics:
+
+• Pending Orders
+• Active Jobs
+• Completed Jobs
+• Average Rating
+
+Each stat should appear in a small card with icon and number.
+
+====================================
+ORDER MANAGEMENT TABS
+=====================
+
+Create tabs for order management:
+
+Pending
+Accepted
+In Progress
+Completed
+Cancelled
+
+Each tab should filter orders automatically.
+
+====================================
+ORDER CARD DESIGN
+=================
+
+Each order must appear in a modern card design containing:
+
+Service icon
+Service name
+Customer name
+Customer location
+Scheduled time
+Short job description
+Order status badge
+
+Action buttons depending on status.
+
+Example:
+
+Pending order:
+Accept
+Reject
+
+Accepted order:
+Start Job
+Cancel
+
+In Progress:
+Mark Completed
+
+Completed:
+View Details
+
+====================================
+VISUAL DESIGN
+=============
+
+Use a modern UI style:
+
+• rounded cards
+• soft shadows
+• clean spacing
+• status color badges
+
+Status colors:
+
+Pending → orange
+Accepted → blue
+In Progress → purple
+Completed → green
+Cancelled → red
+
+====================================
+RESPONSIVE DESIGN
+=================
+
+Dashboard must work perfectly on:
+
+Desktop
+Tablet
+Mobile
+
+Mobile layout should stack order cards vertically.
+
+====================================
+EMPTY STATE DESIGN
+==================
+
+If there are no orders in a section show a friendly message:
+
+"No orders available"
+
+with an illustration icon.
+
+====================================
+REAL-TIME ORDER UPDATES
+=======================
+
+When a new order is assigned to the technician it must appear automatically in the Pending Orders tab.
+
+====================================
+TECHNICIAN PROFILE PANEL
+========================
+
+Add a technician profile section containing:
+
+profile photo
+technician name
+specialization
+average rating
+completed jobs
+
+Technician must also be able to:
+
+edit name
+upload profile photo
+update availability
+
+====================================
+OUTPUT
+======
+
+Provide:
+
+1. updated technician dashboard layout
+2. modern order card UI
+3. responsive design improvements
+4. explanation of UI changes
