@@ -19,6 +19,7 @@ import { Products } from "./pages/Products";
 import { Booking } from "./pages/Booking";
 import { ExpatTools } from "./pages/ExpatTools";
 import { Profile } from "./pages/Profile";
+import { TechnicianProfile } from "./pages/TechnicianProfile";
 
 // Admin Pages
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
@@ -71,6 +72,7 @@ function Router() {
         <Route path="/services" component={Services} />
         <Route path="/products" component={Products} />
         <Route path="/profile" component={Profile} />
+        <Route path="/technician/:id" component={TechnicianProfile} />
 
         {/* Protected customer pages */}
         <Route path="/dashboard">

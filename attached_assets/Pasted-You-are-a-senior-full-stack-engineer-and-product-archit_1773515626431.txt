@@ -1,0 +1,275 @@
+You are a senior full-stack engineer and product architect.
+
+Your task is to analyze, repair, and complete the Fixosmart application so it behaves like a production-ready service marketplace connecting customers with technicians.
+
+IMPORTANT:
+Before making any changes, scan the entire repository, understand the architecture, and identify how the frontend, backend, authentication, and database are connected.
+
+---
+
+## PHASE 1 — Project Analysis
+
+1. Scan the entire repository structure.
+2. Identify:
+
+   * frontend framework
+   * backend framework
+   * routing system
+   * authentication method
+   * database schema
+   * API endpoints
+3. Provide a short explanation of how the application currently works.
+4. Detect any console errors, broken routes, or missing features.
+
+---
+
+## PHASE 2 — Database Structure
+
+Ensure the system supports these core entities:
+
+Users
+
+* id
+* name
+* email
+* password
+* role (admin, customer, technician)
+* profile_photo
+* created_at
+
+Services
+
+* id
+* name
+* description
+* icon
+* base_price
+
+ServiceRequests
+
+* id
+* customer_id
+* technician_id
+* service_id
+* description
+* status
+* created_at
+* updated_at
+
+Reviews
+
+* id
+* customer_id
+* technician_id
+* service_request_id
+* rating
+* comment
+* photo_url
+* created_at
+
+TechnicianAvailability
+
+* technician_id
+* weekday
+* start_time
+* end_time
+
+---
+
+## PHASE 3 — Customer Dashboard
+
+Customers must be able to:
+
+• view available services
+• create service requests
+• track request status
+• view assigned technician
+• view request history
+• edit profile
+• change name
+• upload profile photo
+• logout securely
+
+---
+
+## PHASE 4 — Technician Dashboard
+
+Technicians must be able to:
+
+• view assigned tasks
+• accept or reject requests
+• update task status
+• mark job completed
+• view customer details
+• manage availability
+• edit technician profile
+• see reviews from customers
+
+---
+
+## PHASE 5 — Admin Panel
+
+Admin panel must include:
+
+User Management
+• view customers
+• view technicians
+• suspend users
+
+Service Management
+• view all service requests
+• assign technician
+• update request status
+
+Analytics
+• total users
+• total jobs
+• completed jobs
+• average rating
+
+Admin must also have:
+• profile page
+• logout button
+
+---
+
+## PHASE 6 — Authentication System
+
+Implement secure login/logout for all roles.
+
+Logout must:
+• destroy session or token
+• clear storage
+• redirect to login page
+
+Protected routes must block unauthorized users.
+
+---
+
+## PHASE 7 — Review System
+
+Customers should be able to leave reviews only after a job is completed.
+
+Each review must include:
+• star rating (1–5)
+• comment
+• optional photo
+
+Technician profile must display:
+• average rating
+• total reviews
+• review list
+
+---
+
+## PHASE 8 — Technician Profile Page
+
+Technician profile page must include:
+
+• profile photo
+• name and specialization
+• rating
+• completed jobs
+• location
+• about section
+• services offered
+• work portfolio images
+• customer reviews
+• booking form
+
+---
+
+## PHASE 9 — Homepage UI Design
+
+Design a premium Fixosmart homepage with sections:
+
+1. Hero section
+   headline
+   booking button
+   technician illustration
+
+2. Services section
+   modern service cards
+   dynamic icon colors
+   rating and description
+   book service button
+
+3. Featured technicians
+   technician cards with rating and jobs completed
+
+4. How it works
+   simple 3-step explanation
+
+5. Testimonials
+   customer review slider
+
+6. final call-to-action
+
+---
+
+## PHASE 10 — Modern Service Card UI
+
+Service cards must include:
+
+• icon
+• service name
+• short description
+• rating
+• book button
+
+Icons should use dynamic background colors.
+
+Grid layout:
+• 4 cards desktop
+• 3 cards tablet
+• 2 cards mobile
+
+---
+
+## PHASE 11 — Loading System
+
+Prevent blank white screens.
+
+Create a global loading component.
+
+Show loading UI during:
+• authentication check
+• dashboard data loading
+• logout process
+
+---
+
+## PHASE 12 — Mobile Responsiveness
+
+Ensure the entire application works on:
+
+• mobile
+• tablet
+• desktop
+
+Fix hero image scaling and layout shifting issues.
+
+---
+
+## PHASE 13 — UI/UX Improvements
+
+Use modern design patterns:
+
+• rounded cards
+• soft shadows
+• responsive grid layouts
+• consistent spacing
+• accessible colors
+
+---
+
+## FINAL OUTPUT
+
+Provide:
+
+1. list of issues found
+2. improved database schema
+3. corrected backend logic
+4. improved frontend components
+5. explanation of each change
+6. ensure the application runs smoothly for admin, customer, and technician roles.

@@ -89,6 +89,7 @@ export const reviews = pgTable("reviews", {
   technicianId: integer("technician_id").references(() => technicians.id),
   rating: integer("rating").notNull(), // 1-5
   comment: text("comment"),
+  photoUrl: text("photo_url"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

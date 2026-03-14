@@ -231,6 +231,14 @@ export function useCreateTechnician() {
   });
 }
 
+export function useTechnicianProfile(id: number | undefined) {
+  return useQuery({
+    queryKey: ['/api/technicians', id],
+    queryFn: () => apiFetch(`/api/technicians/${id}`),
+    enabled: !!id,
+  });
+}
+
 // ─── REVIEWS ──────────────────────────────────────────────────────────────────
 
 export function useReviews() {

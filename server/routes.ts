@@ -217,6 +217,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(await storage.getTechnicians());
   });
 
+  app.get('/api/technicians/:id', async (req, res) => {
+    const tech = await storage.getTechnicianById(Number(req.params.id));
+    if (!tech) return res.status(404).json({ message: "Technician not found" });
+    res.json(tech);
+  });
+
   app.post('/api/technicians', requireRole('admin'), async (req, res) => {
     const t = await storage.createTechnician(req.body);
     res.status(201).json(t);
@@ -252,9 +258,41 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(await storage.getReviews());
   });
 
-  app.post('/api/reviews', requireAuth, async (req, res) => {
-    const r = await storage.createReview(req.body);
-    res.status(201).json(r);
+  app.post('/api/reviews', requireAuth, async (req: any, res) => {
+    try {
+      const { bookingId, technicianId, rating, comment, photoUrl } = req.body;
+      if (!bookingId || !rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "bookingId and rating (1-5) are required" });
+      }
+      // Validate booking exists and belongs to this user
+      const userBookings = await storage.getBookings(req.currentUser.id);
+      const booking = userBookings.find(b => b.id === Number(bookingId));
+      if (!booking) {
+        return res.status(403).json({ message: "You can only review your own bookings" });
+      }
+      if (booking.status !== 'completed') {
+        return res.status(400).json({ message: "You can only review completed bookings" });
+      }
+      // Check if already reviewed
+      const alreadyReviewed = await storage.hasReviewedBooking(req.currentUser.id, Number(bookingId));
+      if (alreadyReviewed) {
+        return res.status(409).json({ message: "You have already reviewed this booking" });
+      }
+      const r = await storage.createReview({
+        bookingId: Number(bookingId),
+        userId: req.currentUser.id,
+        technicianId: technicianId ? Number(technicianId) : booking.technicianId,
+        rating: Number(rating),
+        comment: comment || null,
+        photoUrl: photoUrl || null,
+      });
+      // Recalculate technician rating
+      const techId = technicianId ? Number(technicianId) : booking.technicianId;
+      if (techId) await storage.updateTechnicianRating(techId);
+      res.status(201).json(r);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to submit review" });
+    }
   });
 
   // ===== IQAMA =====

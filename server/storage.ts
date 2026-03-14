@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, avg } from "drizzle-orm";
 import {
   users, services, products, bookings, technicians,
   reviews, iqamaTrackers, subscriptions, promoCodes,
@@ -47,13 +47,17 @@ export interface IStorage {
   getTechnicianBookingsWithUsers(technicianId: number): Promise<any[]>;
 
   // TECHNICIANS
-  getTechnicians(): Promise<Technician[]>;
+  getTechnicians(): Promise<any[]>;
+  getTechnicianById(id: number): Promise<any | undefined>;
   getTechnicianByUserId(userId: number): Promise<Technician | undefined>;
   createTechnician(technician: InsertTechnician): Promise<Technician>;
   getAllTechniciansWithUsers(): Promise<any[]>;
+  updateTechnicianRating(technicianId: number): Promise<void>;
 
   // REVIEWS
   getReviews(): Promise<Review[]>;
+  getReviewsByTechnicianId(technicianId: number): Promise<Review[]>;
+  hasReviewedBooking(userId: number, bookingId: number): Promise<boolean>;
   createReview(review: InsertReview): Promise<Review>;
 
   // IQAMA
@@ -154,17 +158,20 @@ export class DatabaseStorage implements IStorage {
 
   async getAllBookingsWithUsers() {
     const allBookings = await db.select().from(bookings).orderBy(desc(bookings.createdAt));
-    const result = [];
-    for (const b of allBookings) {
-      const customer = b.userId ? await this.getUser(b.userId) : null;
-      result.push({
+    const userIds = [...new Set(allBookings.map(b => b.userId).filter(Boolean))] as number[];
+    const userList = userIds.length > 0
+      ? await db.select().from(users).where(sql`${users.id} = ANY(ARRAY[${sql.join(userIds.map(id => sql`${id}`), sql`, `)}]::int[])`)
+      : [];
+    const userMap = Object.fromEntries(userList.map(u => [u.id, u]));
+    return allBookings.map(b => {
+      const customer = b.userId ? userMap[b.userId] : null;
+      return {
         ...b,
         customerName: customer?.fullName || 'Guest',
         customerPhone: customer?.phone || null,
         customerEmail: customer?.email || null,
-      });
-    }
-    return result;
+      };
+    });
   }
 
   async createBooking(booking: InsertBooking) {
@@ -188,20 +195,39 @@ export class DatabaseStorage implements IStorage {
 
   async getTechnicianBookingsWithUsers(technicianId: number) {
     const jobs = await db.select().from(bookings).where(eq(bookings.technicianId, technicianId)).orderBy(desc(bookings.createdAt));
-    const result = [];
-    for (const j of jobs) {
-      const customer = j.userId ? await this.getUser(j.userId) : null;
-      result.push({
+    const userIds = [...new Set(jobs.map(j => j.userId).filter(Boolean))] as number[];
+    const userList = userIds.length > 0
+      ? await db.select().from(users).where(sql`${users.id} = ANY(ARRAY[${sql.join(userIds.map(id => sql`${id}`), sql`, `)}]::int[])`)
+      : [];
+    const userMap = Object.fromEntries(userList.map(u => [u.id, u]));
+    return jobs.map(j => {
+      const customer = j.userId ? userMap[j.userId] : null;
+      return {
         ...j,
         customerName: customer?.fullName || 'Guest',
         customerPhone: customer?.phone || null,
         customerEmail: customer?.email || null,
-      });
-    }
-    return result;
+      };
+    });
   }
 
-  async getTechnicians() { return db.select().from(technicians); }
+  async getTechnicians() {
+    const techs = await db.select().from(technicians);
+    const userIds = [...new Set(techs.map(t => t.userId))];
+    const userList = userIds.length > 0
+      ? await db.select().from(users).where(sql`${users.id} = ANY(ARRAY[${sql.join(userIds.map(id => sql`${id}`), sql`, `)}]::int[])`)
+      : [];
+    const userMap = Object.fromEntries(userList.map(u => [u.id, u]));
+    return techs.map(t => ({ ...t, user: userMap[t.userId] || null }));
+  }
+
+  async getTechnicianById(id: number) {
+    const [t] = await db.select().from(technicians).where(eq(technicians.id, id));
+    if (!t) return undefined;
+    const user = await this.getUser(t.userId);
+    const techReviews = await this.getReviewsByTechnicianId(t.id);
+    return { ...t, user, reviews: techReviews };
+  }
 
   async getTechnicianByUserId(userId: number) {
     const [t] = await db.select().from(technicians).where(eq(technicians.userId, userId));
@@ -215,15 +241,33 @@ export class DatabaseStorage implements IStorage {
 
   async getAllTechniciansWithUsers() {
     const techs = await db.select().from(technicians);
-    const result = [];
-    for (const t of techs) {
-      const user = await this.getUser(t.userId);
-      result.push({ ...t, user });
-    }
-    return result;
+    const userIds = [...new Set(techs.map(t => t.userId))];
+    const userList = userIds.length > 0
+      ? await db.select().from(users).where(sql`${users.id} = ANY(ARRAY[${sql.join(userIds.map(id => sql`${id}`), sql`, `)}]::int[])`)
+      : [];
+    const userMap = Object.fromEntries(userList.map(u => [u.id, u]));
+    return techs.map(t => ({ ...t, user: userMap[t.userId] || null }));
+  }
+
+  async updateTechnicianRating(technicianId: number) {
+    const techReviews = await db.select().from(reviews).where(eq(reviews.technicianId, technicianId));
+    if (techReviews.length === 0) return;
+    const avgRating = techReviews.reduce((sum, r) => sum + r.rating, 0) / techReviews.length;
+    await db.update(technicians)
+      .set({ rating: avgRating.toFixed(2), totalJobs: techReviews.length })
+      .where(eq(technicians.id, technicianId));
   }
 
   async getReviews() { return db.select().from(reviews).orderBy(desc(reviews.createdAt)); }
+
+  async getReviewsByTechnicianId(technicianId: number) {
+    return db.select().from(reviews).where(eq(reviews.technicianId, technicianId)).orderBy(desc(reviews.createdAt));
+  }
+
+  async hasReviewedBooking(userId: number, bookingId: number) {
+    const [r] = await db.select().from(reviews).where(eq(reviews.bookingId, bookingId));
+    return !!r && r.userId === userId;
+  }
 
   async createReview(review: InsertReview) {
     const [r] = await db.insert(reviews).values(review).returning();

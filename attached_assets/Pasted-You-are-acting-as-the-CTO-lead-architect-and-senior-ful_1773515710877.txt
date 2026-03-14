@@ -1,0 +1,287 @@
+You are acting as the CTO, lead architect, and senior full-stack engineer for the Fixosmart platform.
+
+Your mission is to transform this repository into a production-ready service marketplace connecting customers with technicians.
+
+Before making any changes, scan the entire repository, analyze the architecture, and produce a structured plan. Then implement fixes in prioritized phases.
+
+====================================
+PHASE 1 — FULL SYSTEM AUDIT
+===========================
+
+1. Scan the entire project:
+
+   * frontend framework
+   * backend framework
+   * routing
+   * authentication
+   * database schema
+   * APIs
+   * environment configuration
+2. Identify:
+
+   * console errors
+   * broken pages
+   * missing features
+   * security risks
+   * performance issues
+3. Produce a short technical summary of how the system currently works.
+
+====================================
+PHASE 2 — PRODUCT ROADMAP
+=========================
+
+Create a prioritized roadmap to turn Fixosmart into a professional marketplace.
+
+Roadmap categories:
+
+1. Core Platform Stability
+2. User Experience Improvements
+3. Marketplace Features
+4. Security & Authentication
+5. Performance Optimization
+6. Future Growth Features
+
+Explain why each step matters.
+
+====================================
+PHASE 3 — DATABASE ARCHITECTURE
+===============================
+
+Design or repair the database to support a service marketplace.
+
+Core entities:
+
+Users
+
+* id
+* name
+* email
+* password
+* role (admin, customer, technician)
+* profile_photo
+* created_at
+
+Services
+
+* id
+* name
+* description
+* icon
+* base_price
+
+ServiceRequests
+
+* id
+* customer_id
+* technician_id
+* service_id
+* description
+* status
+* created_at
+* updated_at
+
+Reviews
+
+* id
+* customer_id
+* technician_id
+* service_request_id
+* rating
+* comment
+* photo_url
+* created_at
+
+TechnicianAvailability
+
+* technician_id
+* weekday
+* start_time
+* end_time
+
+====================================
+PHASE 4 — ROLE-BASED DASHBOARDS
+===============================
+
+CUSTOMER DASHBOARD
+Customers must be able to:
+
+* browse services
+* create service requests
+* view request status
+* view technician assigned
+* edit profile
+* upload profile photo
+* view service history
+* logout
+
+TECHNICIAN DASHBOARD
+Technicians must be able to:
+
+* view assigned tasks
+* accept or reject jobs
+* update job status
+* mark job completed
+* manage availability
+* view reviews
+* edit profile
+
+ADMIN DASHBOARD
+Admin must manage:
+
+* users (customers and technicians)
+* service requests
+* technician assignments
+* analytics (users, jobs, ratings)
+
+Admin must also have profile management and logout.
+
+====================================
+PHASE 5 — AUTHENTICATION SYSTEM
+===============================
+
+Implement secure login and logout.
+
+Logout must:
+
+* destroy session or token
+* clear local storage
+* redirect to login page
+
+Protect all routes based on role.
+
+====================================
+PHASE 6 — REVIEW SYSTEM
+=======================
+
+Implement a professional review system.
+
+Rules:
+
+* reviews allowed only after job completion
+* star rating (1–5)
+* text comment
+* optional photo upload
+
+Technician profile must show:
+
+* average rating
+* review count
+* review list
+
+====================================
+PHASE 7 — TECHNICIAN PROFILE PAGE
+=================================
+
+Create a professional technician profile including:
+
+* profile photo
+* specialization
+* rating
+* completed jobs
+* location
+* about section
+* services offered
+* portfolio photos
+* customer reviews
+* booking form
+
+====================================
+PHASE 8 — HOMEPAGE UI DESIGN
+============================
+
+Redesign the Fixosmart homepage.
+
+Sections required:
+
+1. Hero section
+   headline
+   booking CTA
+   technician illustration
+
+2. Services section
+   modern cards
+   dynamic icon colors
+   rating and description
+
+3. Featured technicians
+   technician cards with ratings
+
+4. How it works
+   simple 3-step explanation
+
+5. Testimonials
+
+6. Final call-to-action
+
+====================================
+PHASE 9 — MODERN UI SYSTEM
+==========================
+
+Implement modern design patterns:
+
+* rounded cards
+* soft shadows
+* responsive grid layout
+* dynamic service icon colors
+* clean typography
+
+Service grid layout:
+
+* desktop: 4 columns
+* tablet: 3 columns
+* mobile: 2 columns
+
+====================================
+PHASE 10 — LOADING & ERROR STATES
+=================================
+
+Remove blank white screens.
+
+Add:
+
+* global loading component
+* loading states for dashboards
+* loading during logout
+* friendly error messages
+
+====================================
+PHASE 11 — MOBILE RESPONSIVENESS
+================================
+
+Ensure all pages work correctly on:
+
+* mobile
+* tablet
+* desktop
+
+Fix hero images, layout shifts, and scrolling issues.
+
+====================================
+PHASE 12 — SECURITY HARDENING
+=============================
+
+Audit the codebase for vulnerabilities:
+
+* authentication flaws
+* unvalidated inputs
+* insecure API routes
+* exposed secrets
+
+Apply best practices.
+
+====================================
+PHASE 13 — FINAL DELIVERY
+=========================
+
+Provide:
+
+1. issues found
+2. roadmap for improvements
+3. database changes
+4. backend fixes
+5. frontend fixes
+6. UI improvements
+7. security fixes
+8. explanation of all changes
+
+Act like a CTO reviewing a startup product and transform Fixosmart into a professional marketplace platform.

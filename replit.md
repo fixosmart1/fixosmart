@@ -34,6 +34,7 @@ FixoSmart is a trilingual (EN/BN/AR) smart home maintenance and repair marketpla
 - `/` Home, `/dashboard` Customer Dashboard, `/services` Services list
 - `/products` Products marketplace, `/booking` Booking flow
 - `/expat-tools` Expat utilities, `/profile` Login/Profile
+- `/technician/:id` Public Technician Profile page (reviews, stats, bio, book CTA)
 
 ### Technician
 - `/technician/dashboard`, `/technician/jobs`, `/technician/earnings`
@@ -56,7 +57,8 @@ FixoSmart is a trilingual (EN/BN/AR) smart home maintenance and repair marketpla
 - `GET/POST /api/services`, `PUT/DELETE /api/services/:id`
 - `GET/POST /api/products`, `PUT/DELETE /api/products/:id`
 - `GET/POST /api/bookings`, `PATCH /api/bookings/:id/status`
-- `GET /api/technicians`, `GET/PATCH /api/technician/jobs/:id`
+- `GET /api/technicians` (now includes user data — name, phone), `GET /api/technicians/:id` (public profile with reviews)
+- `GET/PATCH /api/technician/jobs/:id`
 - `GET /api/technician/earnings`
 - `GET/POST /api/iqama`, `DELETE /api/iqama/:id`
 - `POST /api/promo/validate`
