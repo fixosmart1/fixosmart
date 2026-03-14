@@ -27,6 +27,7 @@ import { AdminUsers } from "./pages/admin/AdminUsers";
 import { AdminBookings } from "./pages/admin/AdminBookings";
 import { AdminServices } from "./pages/admin/AdminServices";
 import { AdminProducts } from "./pages/admin/AdminProducts";
+import { AdminSettings } from "./pages/admin/AdminSettings";
 
 // Technician Pages
 import { TechnicianDashboard } from "./pages/technician/TechnicianDashboard";
@@ -115,6 +116,11 @@ function Router() {
         <Route path="/admin/products">
           <RequireAuth allowedRoles={['admin']}>
             <AdminProducts />
+          </RequireAuth>
+        </Route>
+        <Route path="/admin/settings">
+          <RequireAuth allowedRoles={['admin']}>
+            <AdminSettings />
           </RequireAuth>
         </Route>
 

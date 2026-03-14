@@ -2,7 +2,7 @@ import { db } from "./db";
 import { eq, desc, sql, avg } from "drizzle-orm";
 import {
   users, services, products, bookings, technicians,
-  reviews, iqamaTrackers, subscriptions, promoCodes,
+  reviews, iqamaTrackers, subscriptions, promoCodes, siteSettings,
   type User, type InsertUser,
   type Service, type InsertService,
   type Product, type InsertProduct,
@@ -12,6 +12,7 @@ import {
   type IqamaTracker, type InsertIqamaTracker,
   type Subscription, type InsertSubscription,
   type PromoCode, type InsertPromoCode,
+  type SiteSetting,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -75,6 +76,10 @@ export interface IStorage {
 
   // ANALYTICS
   getAnalytics(): Promise<{ totalBookings: number; totalRevenue: number; totalUsers: number; totalTechnicians: number; pendingBookings: number; completedBookings: number }>;
+
+  // SITE SETTINGS
+  getSiteSettings(): Promise<SiteSetting[]>;
+  upsertSiteSetting(key: string, value: string): Promise<SiteSetting>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -321,6 +326,18 @@ export class DatabaseStorage implements IStorage {
       pendingBookings: allBookings.filter(b => b.status === 'pending').length,
       completedBookings: allBookings.filter(b => b.status === 'completed').length,
     };
+  }
+
+  async getSiteSettings() {
+    return db.select().from(siteSettings);
+  }
+
+  async upsertSiteSetting(key: string, value: string) {
+    const [s] = await db.insert(siteSettings)
+      .values({ key, value })
+      .onConflictDoUpdate({ target: siteSettings.key, set: { value, updatedAt: new Date() } })
+      .returning();
+    return s;
   }
 }
 

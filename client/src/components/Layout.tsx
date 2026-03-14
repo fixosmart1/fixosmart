@@ -7,7 +7,7 @@ import { useAuth, useLogout } from "@/hooks/use-api";
 import { LoadingScreen } from "./LoadingScreen";
 import {
   Home, LayoutDashboard, Wrench, ShoppingBag, UserCircle,
-  PhoneCall, Users, Calendar, Briefcase, TrendingUp, LogOut
+  PhoneCall, Users, Calendar, Briefcase, TrendingUp, LogOut, Settings
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -49,6 +49,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { href: "/admin/bookings", icon: Calendar, label: t('manage_bookings') },
     { href: "/admin/services", icon: Wrench, label: t('manage_services') },
     { href: "/admin/products", icon: ShoppingBag, label: t('manage_products') },
+    { href: "/admin/settings", icon: Settings, label: "Site Settings" },
   ];
 
   const navItems = role === 'admin' ? adminNav : role === 'technician' ? technicianNav : customerNav;

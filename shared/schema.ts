@@ -126,6 +126,17 @@ export const promoCodes = pgTable("promo_codes", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// SITE SETTINGS — key/value config editable from admin panel
+export const siteSettings = pgTable("site_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  label: text("label"),
+  type: text("type").default("text"), // text | url | number | textarea
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type SiteSetting = typeof siteSettings.$inferSelect;
+
 // ===================== SCHEMAS =====================
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertTechnicianSchema = createInsertSchema(technicians).omit({ id: true, createdAt: true });

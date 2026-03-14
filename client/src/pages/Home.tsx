@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/hooks/use-language";
-import { useServices, useProducts, useTechnicians } from "@/hooks/use-api";
+import { useServices, useProducts, useTechnicians, useSiteSettings } from "@/hooks/use-api";
 import { Link } from "wouter";
 import {
   ArrowRight, Wrench, Zap, Droplet, Cpu, ShieldCheck, Wind,
@@ -91,6 +91,7 @@ export function Home() {
   const { data: services = [] } = useServices();
   const { data: products = []  } = useProducts();
   const { data: technicians = [] } = useTechnicians();
+  const { data: settings = {} } = useSiteSettings();
 
   const [heroIdx, setHeroIdx] = useState(0);
   const [reviewIdx, setReviewIdx] = useState(0);
@@ -152,7 +153,7 @@ export function Home() {
                   ))}
                 </h1>
                 <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed max-w-lg" dir={hero.lang === "ar" ? "rtl" : "ltr"}>
-                  {hero.sub}
+                  {hero.lang === "en" && (settings as any).company_tagline ? (settings as any).company_tagline : hero.sub}
                 </p>
               </motion.div>
             </AnimatePresence>
@@ -192,7 +193,7 @@ export function Home() {
                   <Stars n={5} size={12} />
                   <span className="font-bold text-sm ml-0.5">4.9</span>
                 </div>
-                <p className="text-[10px] text-muted-foreground">500+ happy customers</p>
+                <p className="text-[10px] text-muted-foreground">{(settings as any).hero_stat_customers || "500+ happy customers"}</p>
               </div>
             </div>
             {[
@@ -212,7 +213,7 @@ export function Home() {
             {/* Main image */}
             <div className="rounded-3xl overflow-hidden shadow-2xl shadow-primary/10 aspect-[4/3] lg:aspect-[3/4] max-h-[480px] lg:max-h-none">
               <img
-                src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=900&fit=crop"
+                src={(settings as any).hero_image_url || "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=900&fit=crop"}
                 alt="Technician at work"
                 className="w-full h-full object-cover"
                 loading="eager"
@@ -231,7 +232,7 @@ export function Home() {
                 <CheckCircle size={18} className="text-emerald-600 dark:text-emerald-400" />
               </div>
               <div>
-                <p className="font-bold text-sm leading-none">500+</p>
+                <p className="font-bold text-sm leading-none">{(settings as any).hero_stat_jobs || "500+"}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">Jobs Completed</p>
               </div>
             </motion.div>
@@ -246,7 +247,7 @@ export function Home() {
                 <Star size={18} className="fill-amber-500 text-amber-500" />
               </div>
               <div>
-                <p className="font-bold text-sm leading-none">4.9 / 5</p>
+                <p className="font-bold text-sm leading-none">{(settings as any).hero_stat_rating || "4.9 / 5"}</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">Average Rating</p>
               </div>
             </motion.div>
@@ -258,7 +259,7 @@ export function Home() {
               className="absolute left-1/2 -translate-x-1/2 -bottom-4 glass rounded-2xl px-5 py-3 shadow-xl flex items-center gap-3 whitespace-nowrap"
             >
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <p className="text-xs font-semibold">Technicians Available Now</p>
+              <p className="text-xs font-semibold">{(settings as any).hero_available_text || "Technicians Available Now"}</p>
             </motion.div>
           </div>
         </div>

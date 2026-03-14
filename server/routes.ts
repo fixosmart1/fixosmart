@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import * as schema from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import crypto from "crypto";
 
@@ -89,6 +89,24 @@ async function seedDatabase() {
     await db.insert(schema.users).values({ fullName: "Admin", role: "admin", email: "admin@fixosmart.com" }).returning();
     const [tech] = await db.insert(schema.users).values({ fullName: "Mohammed Al-Harbi", role: "technician", phone: "+966501234567" }).returning();
     await db.insert(schema.technicians).values({ userId: tech.id, specialization: "AC", bio: "10 years experience in AC repair and maintenance", rating: "4.9", totalJobs: 127, hourlyRate: "80" });
+  }
+
+  // Seed default site settings if not present
+  const defaultSettings = [
+    { key: "hero_image_url",     value: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=900&fit=crop", label: "Hero Photo (right side)",       type: "url" },
+    { key: "hero_stat_jobs",     value: "500+",   label: "Hero Stat — Jobs Completed",  type: "text" },
+    { key: "hero_stat_rating",   value: "4.9 / 5", label: "Hero Stat — Average Rating",  type: "text" },
+    { key: "hero_stat_customers", value: "500+ happy customers", label: "Hero — Customers Badge Text",  type: "text" },
+    { key: "hero_available_text", value: "Technicians Available Now", label: "Hero — Availability Tag",  type: "text" },
+    { key: "contact_whatsapp",   value: "+966501234567", label: "WhatsApp / Contact Number",  type: "text" },
+    { key: "company_tagline",    value: "Professional smart-home services for Jeddah residents — in English, বাংলা, and العربية.", label: "Hero Subtitle (English)", type: "textarea" },
+    { key: "footer_note",        value: "Serving Jeddah, Saudi Arabia", label: "Footer / Location Note",     type: "text" },
+  ];
+  const existingKeys = (await db.select({ key: schema.siteSettings.key }).from(schema.siteSettings)).map(s => s.key);
+  for (const s of defaultSettings) {
+    if (!existingKeys.includes(s.key)) {
+      await db.insert(schema.siteSettings).values(s);
+    }
   }
 }
 
@@ -376,6 +394,30 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post('/api/admin/promos', requireRole('admin'), async (req, res) => {
     const p = await storage.createPromoCode({ ...req.body, code: req.body.code.toUpperCase() });
     res.status(201).json(p);
+  });
+
+  // ===== SITE SETTINGS =====
+  app.get('/api/settings', async (req, res) => {
+    const all = await storage.getSiteSettings();
+    // Return as object map for easy frontend use
+    const map: Record<string, string> = {};
+    for (const s of all) map[s.key] = s.value;
+    res.json(map);
+  });
+
+  app.get('/api/admin/settings', requireRole('admin'), async (req, res) => {
+    res.json(await storage.getSiteSettings());
+  });
+
+  app.patch('/api/admin/settings', requireRole('admin'), async (req, res) => {
+    try {
+      const { key, value } = req.body;
+      if (!key || value === undefined) return res.status(400).json({ message: "key and value required" });
+      const s = await storage.upsertSiteSetting(key, String(value));
+      res.json(s);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to save setting" });
+    }
   });
 
   seedDatabase().catch(console.error);

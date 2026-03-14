@@ -3,7 +3,7 @@ import { useAdminAnalytics } from "@/hooks/use-api";
 import { Link } from "wouter";
 import {
   LayoutDashboard, Users, Calendar, Wrench, ShoppingBag, TrendingUp,
-  CheckCircle, Clock, AlertCircle, DollarSign
+  CheckCircle, Clock, AlertCircle, DollarSign, Settings
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -25,6 +25,7 @@ export function AdminDashboard() {
     { href: "/admin/bookings", icon: Calendar, label: t('manage_bookings'), color: "bg-purple-500/10 border-purple-500/20" },
     { href: "/admin/services", icon: Wrench, label: t('manage_services'), color: "bg-green-500/10 border-green-500/20" },
     { href: "/admin/products", icon: ShoppingBag, label: t('manage_products'), color: "bg-amber-500/10 border-amber-500/20" },
+    { href: "/admin/settings", icon: Settings, label: "Site Settings", color: "bg-slate-500/10 border-slate-500/20" },
   ];
 
   return (

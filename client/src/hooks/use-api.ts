@@ -304,6 +304,35 @@ export function useCreatePromoCode() {
   });
 }
 
+// ─── SITE SETTINGS ────────────────────────────────────────────────────────────
+
+export function useSiteSettings() {
+  return useQuery<Record<string, string>>({
+    queryKey: ['/api/settings'],
+    queryFn: () => apiFetch('/api/settings'),
+    staleTime: 60000,
+  });
+}
+
+export function useAdminSettings() {
+  return useQuery({
+    queryKey: ['/api/admin/settings'],
+    queryFn: () => apiFetch('/api/admin/settings'),
+  });
+}
+
+export function useUpdateSiteSetting() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, value }: { key: string; value: string }) =>
+      jsonMutation('PATCH', '/api/admin/settings', { key, value }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['/api/settings'] });
+      qc.invalidateQueries({ queryKey: ['/api/admin/settings'] });
+    },
+  });
+}
+
 // ─── ADMIN ────────────────────────────────────────────────────────────────────
 
 export function useAdminAnalytics() {
