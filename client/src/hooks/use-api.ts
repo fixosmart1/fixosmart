@@ -105,6 +105,53 @@ export function useDeleteService() {
   });
 }
 
+// ─── SERVICE ADD-ONS ──────────────────────────────────────────────────────────
+
+export function useServiceAddons(serviceId: number) {
+  return useQuery({
+    queryKey: ['/api/services', serviceId, 'addons'],
+    queryFn: () => apiFetch(`/api/services/${serviceId}/addons`),
+    enabled: !!serviceId,
+  });
+}
+
+export function useCreateServiceAddon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ serviceId, data }: { serviceId: number; data: any }) =>
+      jsonMutation('POST', `/api/services/${serviceId}/addons`, data),
+    onSuccess: (_: any, vars: any) => qc.invalidateQueries({ queryKey: ['/api/services', vars.serviceId, 'addons'] }),
+  });
+}
+
+export function useUpdateServiceAddon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) =>
+      jsonMutation('PUT', `/api/addons/${id}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['/api/services'] }),
+  });
+}
+
+export function useDeleteServiceAddon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, serviceId }: { id: number; serviceId: number }) =>
+      apiFetch(`/api/addons/${id}`, { method: 'DELETE' }),
+    onSuccess: (_: any, vars: any) => qc.invalidateQueries({ queryKey: ['/api/services', vars.serviceId, 'addons'] }),
+  });
+}
+
+// ─── SERVICE REVIEWS ─────────────────────────────────────────────────────────
+
+export function useServiceReviews(serviceId: number) {
+  return useQuery({
+    queryKey: ['/api/services', serviceId, 'reviews'],
+    queryFn: () => apiFetch(`/api/services/${serviceId}/reviews`),
+    enabled: !!serviceId,
+  });
+}
+
 // ─── PRODUCTS ─────────────────────────────────────────────────────────────────
 
 export function useProducts() {

@@ -15,6 +15,7 @@ import { LoadingScreen } from "./components/LoadingScreen";
 import { Home } from "./pages/Home";
 import { Dashboard } from "./pages/Dashboard";
 import { Services } from "./pages/Services";
+import { ServiceDetail } from "./pages/ServiceDetail";
 import { Products } from "./pages/Products";
 import { Booking } from "./pages/Booking";
 import { ExpatTools } from "./pages/ExpatTools";
@@ -74,6 +75,7 @@ function Router() {
         {/* Public customer pages */}
         <Route path="/" component={Home} />
         <Route path="/services" component={Services} />
+        <Route path="/services/:id" component={ServiceDetail} />
         <Route path="/products" component={Products} />
         <Route path="/profile" component={Profile} />
 

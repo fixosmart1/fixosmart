@@ -119,6 +119,17 @@ export const bookings = pgTable("bookings", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// SERVICE ADD-ONS
+export const serviceAddons = pgTable("service_addons", {
+  id: serial("id").primaryKey(),
+  serviceId: integer("service_id").references(() => services.id).notNull(),
+  nameEn: text("name_en").notNull(),
+  nameBn: text("name_bn").notNull(),
+  nameAr: text("name_ar").notNull(),
+  priceSar: numeric("price_sar").notNull(),
+  isActive: boolean("is_active").default(true),
+});
+
 // REVIEWS
 export const reviews = pgTable("reviews", {
   id: serial("id").primaryKey(),
@@ -180,6 +191,7 @@ export const insertUserSchema = createInsertSchema(users).omit({ id: true, creat
 export const insertTechnicianSchema = createInsertSchema(technicians).omit({ id: true, createdAt: true });
 export const insertTechnicianVerificationSchema = createInsertSchema(technicianVerifications).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertServiceSchema = createInsertSchema(services).omit({ id: true });
+export const insertServiceAddonSchema = createInsertSchema(serviceAddons).omit({ id: true });
 export const insertProductSchema = createInsertSchema(products).omit({ id: true });
 export const insertBookingSchema = createInsertSchema(bookings).omit({ id: true, createdAt: true });
 export const insertReviewSchema = createInsertSchema(reviews).omit({ id: true, createdAt: true });
@@ -199,6 +211,9 @@ export type InsertTechnicianVerification = z.infer<typeof insertTechnicianVerifi
 
 export type Service = typeof services.$inferSelect;
 export type InsertService = z.infer<typeof insertServiceSchema>;
+
+export type ServiceAddon = typeof serviceAddons.$inferSelect;
+export type InsertServiceAddon = z.infer<typeof insertServiceAddonSchema>;
 
 export type Product = typeof products.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;

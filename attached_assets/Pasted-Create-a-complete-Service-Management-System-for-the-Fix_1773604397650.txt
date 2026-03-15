@@ -1,0 +1,225 @@
+Create a complete Service Management System for the FixoSmart platform.
+
+FixoSmart is a smart home maintenance marketplace operating in Jeddah, Saudi Arabia where customers can book technicians for home services.
+
+The service section must allow customers to browse services, view details, and book technicians. All services must be fully editable and customizable from the admin panel.
+
+---
+
+## SERVICE SECTION (CUSTOMER SIDE)
+
+Create a modern service marketplace page.
+
+Include the following features:
+
+1. Service Categories
+
+Display service categories at the top as tabs or filters.
+
+Categories include:
+
+AC Services
+Electrical
+Plumbing
+Security Systems
+Smart Home
+Emergency Services
+
+Users should be able to filter services by category.
+
+---
+
+2. Featured Services
+
+Display a section for “Most Popular Services”.
+
+Examples:
+
+AC Cleaning
+AC Repair
+Electrical Repair
+Water Leak Repair
+CCTV Installation
+
+Each card should include:
+
+service image
+service name
+short description
+starting price in SAR
+rating
+Book Now button
+
+---
+
+3. Service Card Layout
+
+Each service card must include:
+
+Service image
+Service title
+Short description
+Starting price
+Rating
+Estimated service time
+Book Now button
+
+Clicking a service opens the service details page.
+
+---
+
+4. Service Details Page
+
+Create a detailed service page with:
+
+Service title
+Description
+Service images
+What's included in the service
+Estimated service duration
+Starting price in SAR
+
+Show available technicians for that service.
+
+Technician cards include:
+
+Technician name
+Rating
+Jobs completed
+
+Include a “Book Technician” button.
+
+---
+
+5. Add-ons System
+
+Allow customers to add extra service options.
+
+Examples:
+
+AC Deep Cleaning (+49 SAR)
+Gas Refill (+79 SAR)
+Emergency Priority (+39 SAR)
+
+Add-ons should dynamically update the price.
+
+---
+
+6. Reviews and Ratings
+
+Show customer reviews and ratings under each service.
+
+Display:
+
+rating stars
+review text
+reviewer name
+
+---
+
+7. Booking Button
+
+Add a sticky "Book Technician" button for mobile users.
+
+Clicking this opens the booking flow where the user selects:
+
+Jeddah district
+date
+time
+address
+
+---
+
+## ADMIN SERVICE MANAGEMENT PANEL
+
+Create a powerful admin panel where all services can be managed.
+
+Admin must be able to:
+
+Add new services
+Edit service names
+Edit descriptions
+Update prices
+Upload service images
+Enable or disable services
+Add new service categories
+
+Admin can also manage service add-ons:
+
+Add add-ons
+Edit add-on price
+Delete add-ons
+
+---
+
+SERVICE PRICING CONTROL
+
+Admin must be able to update pricing anytime.
+
+Example:
+
+AC Cleaning
+Price: 79 SAR → updated to 89 SAR
+
+Changes must instantly reflect in the customer app.
+
+---
+
+TECHNICIAN SERVICE ASSIGNMENT
+
+Admin can assign services to technicians.
+
+Technicians must choose the services they provide.
+
+Example:
+
+Technician Ahmed
+
+Services:
+AC Repair
+AC Cleaning
+AC Installation
+
+---
+
+SERVICE ANALYTICS
+
+Admin dashboard should display:
+
+Most booked services
+Revenue per service
+Service popularity
+
+---
+
+MULTI-LANGUAGE SUPPORT
+
+The service system must support:
+
+English
+Arabic
+Bangla
+
+When Arabic is selected the UI switches to RTL layout.
+
+---
+
+DESIGN SYSTEM
+
+Use a modern card-based layout.
+
+Primary color: #1E40AF
+Success color: #16A34A
+Accent gold: #FBBF24
+
+Mobile-first design with clean icons and fast navigation.
+
+---
+
+GOAL
+
+Create a powerful service marketplace system where:
+
+Customers can easily discover and book services.
+Technicians can offer services.
+Admins can fully control and customize the service catalog.

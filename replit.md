@@ -22,7 +22,8 @@ FixoSmart is a trilingual (EN/BN/AR) smart home maintenance and repair marketpla
 - **Customer App**: Home, Dashboard, Services, Products, Booking (3-step with notes+promo), Expat Tools
 - **Technician Panel**: Dashboard (access-controlled), Jobs (status workflow + customer info card with phone link), Earnings
 - **Technician Verification System**: 3-step application wizard (Personal → Professional → Documents), verification status page with progress steps, access control (redirects unverified techs), "VERIFIED" trust badge on dashboard header
-- **Admin Dashboard**: Analytics (incl. pending verifications count), Users (role/suspend/delete), Bookings (customer info + tech assignment), Services CRUD, Products CRUD
+- **Admin Dashboard**: Analytics (incl. pending verifications count), Users (role/suspend/delete), Bookings (customer info + tech assignment), Products CRUD
+- **Service Management System**: Customer services page with category filter tabs (AC/Electric/Plumbing/Security/Smart Home/Appliance), live search, featured "Most Popular" section, detailed service cards with image/rating/ETA/price; Service Detail page (`/services/:id`) with add-ons checklist (dynamic price total), technician cards, reviews, sticky mobile Book button; Admin panel with service analytics bar chart, inline editing, enable/disable toggle, per-service add-on CRUD; `serviceAddons` table in DB
 - **Admin Verification Center**: Filterable list (All/Pending/Approved/Rejected), expandable application cards with full details, portfolio image preview, admin quality scoring (Experience/Portfolio/Documents/Communication, 1–5 each), approve/reject/request-more actions, admin notes, auto-creates technician profile on approval
 - **Booking System**: 3-step flow, notes field, promo code with live discount, WhatsApp share, emergency SOS mode
 - **Expat Tools**: Iqama tracker (30-day warning), SAR→BDT converter (29.5 rate), prayer times, WhatsApp share

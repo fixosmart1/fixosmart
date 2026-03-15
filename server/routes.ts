@@ -251,6 +251,28 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.status(204).send();
   });
 
+  // ===== SERVICE ADD-ONS =====
+  app.get('/api/services/:id/addons', async (req, res) => {
+    res.json(await storage.getServiceAddons(Number(req.params.id)));
+  });
+  app.post('/api/services/:id/addons', requireRole('admin'), async (req, res) => {
+    const a = await storage.createServiceAddon({ ...req.body, serviceId: Number(req.params.id) });
+    res.status(201).json(a);
+  });
+  app.put('/api/addons/:id', requireRole('admin'), async (req, res) => {
+    const a = await storage.updateServiceAddon(Number(req.params.id), req.body);
+    res.json(a);
+  });
+  app.delete('/api/addons/:id', requireRole('admin'), async (req, res) => {
+    await storage.deleteServiceAddon(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  // ===== SERVICE REVIEWS =====
+  app.get('/api/services/:id/reviews', async (req, res) => {
+    res.json(await storage.getReviewsByServiceId(Number(req.params.id)));
+  });
+
   // ===== PRODUCTS =====
   app.get('/api/products', async (req, res) => {
     res.json(await storage.getProducts());

@@ -3,9 +3,10 @@ import { eq, desc, sql, avg } from "drizzle-orm";
 import {
   users, services, products, bookings, technicians,
   reviews, iqamaTrackers, subscriptions, promoCodes, siteSettings,
-  technicianVerifications,
+  technicianVerifications, serviceAddons,
   type User, type InsertUser,
   type Service, type InsertService,
+  type ServiceAddon, type InsertServiceAddon,
   type Product, type InsertProduct,
   type Booking, type InsertBooking,
   type Technician, type InsertTechnician,
@@ -35,6 +36,13 @@ export interface IStorage {
   createService(service: InsertService): Promise<Service>;
   updateService(id: number, data: Partial<InsertService>): Promise<Service>;
   deleteService(id: number): Promise<void>;
+  // SERVICE ADD-ONS
+  getServiceAddons(serviceId: number): Promise<ServiceAddon[]>;
+  createServiceAddon(addon: InsertServiceAddon): Promise<ServiceAddon>;
+  updateServiceAddon(id: number, data: Partial<InsertServiceAddon>): Promise<ServiceAddon>;
+  deleteServiceAddon(id: number): Promise<void>;
+  // REVIEWS BY SERVICE
+  getReviewsByServiceId(serviceId: number): Promise<any[]>;
 
   // PRODUCTS
   getProducts(): Promise<Product[]>;
@@ -162,6 +170,27 @@ export class DatabaseStorage implements IStorage {
 
   async deleteService(id: number) {
     await db.delete(services).where(eq(services.id, id));
+  }
+
+  async getServiceAddons(serviceId: number) {
+    return db.select().from(serviceAddons).where(eq(serviceAddons.serviceId, serviceId));
+  }
+  async createServiceAddon(addon: InsertServiceAddon) {
+    const [a] = await db.insert(serviceAddons).values(addon).returning();
+    return a;
+  }
+  async updateServiceAddon(id: number, data: Partial<InsertServiceAddon>) {
+    const [a] = await db.update(serviceAddons).set(data).where(eq(serviceAddons.id, id)).returning();
+    return a;
+  }
+  async deleteServiceAddon(id: number) {
+    await db.delete(serviceAddons).where(eq(serviceAddons.id, id));
+  }
+  async getReviewsByServiceId(serviceId: number) {
+    const all = await db.select().from(reviews).orderBy(desc(reviews.createdAt));
+    const serviceBookings = await db.select().from(bookings).where(eq(bookings.serviceId, serviceId));
+    const bookingIds = serviceBookings.map(b => b.id);
+    return all.filter(r => r.bookingId && bookingIds.includes(r.bookingId));
   }
 
   async getProducts() { return db.select().from(products); }
