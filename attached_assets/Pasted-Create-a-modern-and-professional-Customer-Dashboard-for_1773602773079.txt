@@ -1,0 +1,189 @@
+Create a modern and professional Customer Dashboard for the FixoSmart smart home maintenance platform.
+
+Context:
+FixoSmart is a home service marketplace operating in Jeddah, Saudi Arabia where users can book technicians for AC repair, electrical issues, plumbing, smart home installation, and emergency home problems.
+
+Design a mobile-first dashboard that is fast, clean, and easy to use.
+
+---
+
+1. DASHBOARD HEADER
+
+---
+
+Display a welcome section at the top.
+
+Include:
+
+* User greeting (Welcome back, [Name])
+* Current location (District, Jeddah)
+* Weather widget
+* Notification bell icon
+* Language switcher (Bangla / English / Arabic)
+* Profile avatar
+
+---
+
+2. ACTIVE SERVICE TRACKER
+
+---
+
+If the user has an active booking, display a card showing:
+
+Service type
+Technician name
+Status (On the way / In progress / Completed)
+ETA arrival time
+
+Buttons:
+Call Technician
+Chat on WhatsApp
+Track Service
+
+---
+
+3. QUICK SERVICES GRID
+
+---
+
+Create a grid of popular services for quick booking:
+
+AC Repair
+Electrical
+Plumbing
+CCTV Installation
+Smart Home Setup
+
+Each service card should include:
+icon
+service name
+"Book Now" button
+
+---
+
+4. EMERGENCY SOS SECTION
+
+---
+
+Show an emergency card that allows users to request urgent help.
+
+Include:
+Emergency title
+Short description
+Large "SOS Emergency Help" button
+
+This should connect with the existing emergency system.
+
+---
+
+5. UPCOMING BOOKINGS
+
+---
+
+Display upcoming scheduled services with:
+
+Service name
+Date and time
+Technician assigned
+
+Include a button to reschedule or cancel.
+
+---
+
+6. SERVICE HISTORY
+
+---
+
+Show recent completed services.
+
+Include:
+service name
+date
+status
+
+Add a "Rebook" button for quick repeat service.
+
+---
+
+7. SMART GADGET STORE
+
+---
+
+Display a horizontal scroll section for smart home products:
+
+Smart Door Lock
+CCTV Camera
+Smart Bulb
+
+Include price in SAR and "View Product" button.
+
+---
+
+8. EXPAT TOOLS SECTION
+
+---
+
+Add tools useful for expatriates in Saudi Arabia:
+
+Currency Converter (SAR to BDT)
+Iqama Expiry Tracker
+Prayer Times
+
+Each tool should be displayed as a clickable card.
+
+---
+
+9. PROMOTIONS / SPECIAL OFFERS
+
+---
+
+Add a promotional banner section for special offers such as:
+
+AC Cleaning Discount
+Seasonal Maintenance Packages
+
+---
+
+10. MOBILE BOTTOM NAVIGATION
+
+---
+
+Add a fixed bottom navigation bar:
+
+Home
+Services
+Bookings
+Store
+Profile
+
+---
+
+11. MULTI-LANGUAGE SUPPORT
+
+---
+
+Support three languages:
+
+English
+Arabic
+Bangla
+
+When Arabic is selected the layout should automatically switch to RTL.
+
+---
+
+12. DESIGN SYSTEM
+
+---
+
+Primary color: #1E40AF
+Success color: #16A34A
+Gold accent: #FBBF24
+
+Use card-based layout with rounded corners, icons, and soft shadows.
+
+---
+
+GOAL
+
+Create a clean, professional dashboard where customers can quickly book services, track technicians, access emergency help, and manage their home maintenance easily.

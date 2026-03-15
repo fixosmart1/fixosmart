@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useLanguage } from "@/hooks/use-language";
 import { LanguageSwitcher } from "./LanguageSwitcher";
@@ -21,6 +21,13 @@ export function Layout({ children }: { children: ReactNode }) {
   const [sosOpen, setSosOpen] = useState(false);
 
   const role = user?.role || 'customer';
+
+  // Listen for custom SOS trigger event from any page (e.g., Dashboard SOS card)
+  useEffect(() => {
+    const handler = () => setSosOpen(true);
+    window.addEventListener('fixo:sos', handler);
+    return () => window.removeEventListener('fixo:sos', handler);
+  }, []);
 
   const handleLogout = async () => {
     setLoggingOut(true);
