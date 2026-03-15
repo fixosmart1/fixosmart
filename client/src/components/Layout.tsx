@@ -147,8 +147,8 @@ export function Layout({ children }: { children: ReactNode }) {
           </main>
         </div>
 
-        {/* ─── SOS Floating Button (customers only) ─── */}
-        {role === 'customer' && (
+        {/* ─── SOS Floating Button (authenticated customers only) ─── */}
+        {user?.role === 'customer' && (
           <motion.button
             onClick={() => setSosOpen(true)}
             whileTap={{ scale: 0.92 }}

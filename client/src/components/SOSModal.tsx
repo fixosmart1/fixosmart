@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth, useCreateBooking, useTechnicians } from "@/hooks/use-api";
 import { useToast } from "@/hooks/use-toast";
 import {
-  X, Zap, Droplets, Wind, Lock, Camera, MapPin,
-  ChevronRight, Star, Phone, MessageCircle, Clock,
-  CheckCircle, Navigation, AlertTriangle, Loader2
+  X, Zap, MapPin, ChevronRight, Star, Phone, MessageCircle,
+  Clock, CheckCircle, Navigation, AlertTriangle, Loader2,
+  LocateFixed, Crosshair, Radio
 } from "lucide-react";
 
 interface SOSModalProps {
@@ -14,6 +14,7 @@ interface SOSModalProps {
   onClose: () => void;
 }
 
+// ── Emergency types ─────────────────────────────────────────────────────────
 const EMERGENCY_TYPES = [
   {
     id: "electrical",
@@ -82,27 +83,158 @@ const EMERGENCY_TYPES = [
   },
 ];
 
-const DISTRICTS = ["Al-Safa", "Al-Hamra", "Al-Rawdah", "Obhur", "Al-Nazlah", "Al-Basateen", "Al-Marwah", "Al-Sharafiyah", "Al-Balad"];
-
-const MOCK_TECHNICIANS = [
-  { name: "Ahmed Al-Rashidi", rating: 4.9, distance: "1.8 km", specialty: "Electrical", eta: 12, avatar: "A" },
-  { name: "Mohammed Al-Harbi", rating: 4.8, distance: "2.3 km", specialty: "AC & HVAC", eta: 18, avatar: "M" },
-  { name: "Karim Hassan", rating: 4.7, distance: "3.1 km", specialty: "Plumbing", eta: 22, avatar: "K" },
+// ── Jeddah district data with approx map positions ───────────────────────────
+// Jeddah bounds: lat 21.3–21.7 / lng 39.10–39.35
+const DISTRICTS: { name: string; lat: number; lng: number }[] = [
+  { name: "Al-Safa",        lat: 21.558, lng: 39.163 },
+  { name: "Al-Hamra",       lat: 21.568, lng: 39.157 },
+  { name: "Al-Rawdah",      lat: 21.546, lng: 39.176 },
+  { name: "Obhur",          lat: 21.642, lng: 39.143 },
+  { name: "Al-Nazlah",      lat: 21.518, lng: 39.188 },
+  { name: "Al-Basateen",    lat: 21.505, lng: 39.201 },
+  { name: "Al-Marwah",      lat: 21.554, lng: 39.143 },
+  { name: "Al-Sharafiyah",  lat: 21.527, lng: 39.169 },
+  { name: "Al-Balad",       lat: 21.486, lng: 39.186 },
 ];
 
+// Jeddah bounding box
+const J_LAT_MIN = 21.3, J_LAT_MAX = 21.7;
+const J_LNG_MIN = 39.10, J_LNG_MAX = 39.35;
+
+function toMapPct(lat: number, lng: number) {
+  const x = Math.min(90, Math.max(10, ((lng - J_LNG_MIN) / (J_LNG_MAX - J_LNG_MIN)) * 100));
+  const y = Math.min(90, Math.max(10, ((J_LAT_MAX - lat) / (J_LAT_MAX - J_LAT_MIN)) * 100));
+  return { x, y };
+}
+
+// Jeddah center fallback
+const JEDDAH_LAT = 21.5433;
+const JEDDAH_LNG = 39.1728;
+
+// ── Animation helpers ─────────────────────────────────────────────────────────
 const slideUp = {
-  initial: { opacity: 0, y: 40 },
+  initial: { opacity: 0, y: 30 },
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -20 },
-  transition: { type: "spring", stiffness: 300, damping: 30 },
+  transition: { type: "spring" as const, stiffness: 320, damping: 32 },
 };
+const stagger = { animate: { transition: { staggerChildren: 0.06 } } };
+const cardItem = { initial: { opacity: 0, x: -18 }, animate: { opacity: 1, x: 0 } };
 
-const stagger = { animate: { transition: { staggerChildren: 0.07 } } };
-const cardVariant = {
-  initial: { opacity: 0, x: -20 },
-  animate: { opacity: 1, x: 0 },
-};
+// ── Jeddah Map component ──────────────────────────────────────────────────────
+function JeddahMap({
+  userLat, userLng, techLat, techLng, showTech = false, etaSec = 0,
+}: {
+  userLat: number; userLng: number;
+  techLat?: number; techLng?: number;
+  showTech?: boolean; etaSec?: number;
+}) {
+  const user = toMapPct(userLat, userLng);
+  const tech = techLat !== undefined && techLng !== undefined ? toMapPct(techLat, techLng) : null;
 
+  return (
+    <div className="relative w-full h-full overflow-hidden">
+      {/* Map background */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: "linear-gradient(135deg, #1a2744 0%, #0f1e3d 30%, #162032 60%, #1a2e1a 100%)",
+        }}
+      />
+
+      {/* Street grid SVG */}
+      <svg className="absolute inset-0 w-full h-full opacity-30" xmlns="http://www.w3.org/2000/svg">
+        {/* Major horizontal roads */}
+        {[25, 40, 55, 70, 82].map(y => (
+          <line key={`h${y}`} x1="0" y1={`${y}%`} x2="100%" y2={`${y}%`} stroke="#4a90d9" strokeWidth="1.5" />
+        ))}
+        {/* Minor horizontal */}
+        {[15, 32, 48, 62, 76, 90].map(y => (
+          <line key={`hm${y}`} x1="0" y1={`${y}%`} x2="100%" y2={`${y}%`} stroke="#2a5080" strokeWidth="0.6" />
+        ))}
+        {/* Major vertical roads */}
+        {[20, 38, 55, 72, 88].map(x => (
+          <line key={`v${x}`} x1={`${x}%`} y1="0" x2={`${x}%`} y2="100%" stroke="#4a90d9" strokeWidth="1.5" />
+        ))}
+        {/* Minor vertical */}
+        {[10, 28, 46, 63, 80].map(x => (
+          <line key={`vm${x}`} x1={`${x}%`} y1="0" x2={`${x}%`} y2="100%" stroke="#2a5080" strokeWidth="0.6" />
+        ))}
+        {/* City blocks */}
+        <rect x="30%" y="35%" width="15%" height="12%" fill="#1f3520" opacity="0.5" rx="2" />
+        <rect x="55%" y="20%" width="20%" height="15%" fill="#1c2f40" opacity="0.5" rx="2" />
+        <rect x="10%" y="60%" width="18%" height="14%" fill="#1f3520" opacity="0.5" rx="2" />
+        <rect x="65%" y="55%" width="15%" height="18%" fill="#1c2f40" opacity="0.5" rx="2" />
+      </svg>
+
+      {/* District labels */}
+      {DISTRICTS.map(d => {
+        const p = toMapPct(d.lat, d.lng);
+        return (
+          <div
+            key={d.name}
+            className="absolute text-[8px] text-blue-300/60 font-medium whitespace-nowrap pointer-events-none select-none"
+            style={{ left: `${p.x}%`, top: `${p.y}%`, transform: "translate(-50%, -50%)" }}
+          >
+            {d.name}
+          </div>
+        );
+      })}
+
+      {/* ETA badge (step 6 only) */}
+      {showTech && etaSec > 0 && (
+        <div className="absolute top-2 left-2 z-20 bg-black/70 backdrop-blur rounded-lg px-2 py-1 flex items-center gap-1 border border-white/10">
+          <Clock size={11} className="text-primary" />
+          <span className="font-mono font-bold text-xs text-white">
+            {Math.floor(etaSec / 60)}:{String(etaSec % 60).padStart(2, "0")}
+          </span>
+        </div>
+      )}
+
+      {/* Technician marker */}
+      {showTech && tech && (
+        <motion.div
+          className="absolute z-10"
+          animate={{ left: `${tech.x}%`, top: `${tech.y}%` }}
+          transition={{ duration: 0.8, ease: "linear" }}
+          style={{ transform: "translate(-50%,-50%)" }}
+        >
+          <div className="w-8 h-8 bg-destructive rounded-full flex items-center justify-center border-2 border-white shadow-lg shadow-destructive/60">
+            <Zap size={13} className="text-white" />
+          </div>
+          <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-destructive text-white text-[8px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap">
+            TECH
+          </div>
+        </motion.div>
+      )}
+
+      {/* User location pin */}
+      <div
+        className="absolute z-20"
+        style={{ left: `${user.x}%`, top: `${user.y}%`, transform: "translate(-50%,-50%)" }}
+      >
+        <div className="relative">
+          <motion.div
+            className="absolute inset-0 bg-blue-400/40 rounded-full"
+            animate={{ scale: [1, 2.2, 1], opacity: [0.6, 0, 0.6] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+          <div className="relative w-5 h-5 bg-blue-500 rounded-full border-2 border-white shadow-lg shadow-blue-500/60 z-10" />
+        </div>
+        <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap">
+          YOU
+        </div>
+      </div>
+
+      {/* Branding */}
+      <div className="absolute bottom-2 right-2 text-[8px] text-white/30 font-medium">
+        FixoSmart Map • Jeddah
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
 export function SOSModal({ isOpen, onClose }: SOSModalProps) {
   const { language, isRtl } = useLanguage();
   const { data: user } = useAuth();
@@ -110,97 +242,181 @@ export function SOSModal({ isOpen, onClose }: SOSModalProps) {
   const createBooking = useCreateBooking();
   const { toast } = useToast();
 
-  const [step, setStep] = useState(1); // 1=select 2=location 3=confirm 4=searching 5=found 6=tracking
+  // Steps: 1=select type  2=location  3=confirm  4=searching  5=found  6=tracking
+  const [step, setStep] = useState(1);
   const [selectedType, setSelectedType] = useState<typeof EMERGENCY_TYPES[0] | null>(null);
-  const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState<typeof DISTRICTS[0] | null>(null);
   const [address, setAddress] = useState("");
-  const [foundTech, setFoundTech] = useState<typeof MOCK_TECHNICIANS[0] | null>(null);
+
+  // Geolocation state
+  const [geoStatus, setGeoStatus] = useState<"idle" | "detecting" | "success" | "fallback">("idle");
+  const [userLat, setUserLat] = useState(JEDDAH_LAT);
+  const [userLng, setUserLng] = useState(JEDDAH_LNG);
+
+  // Tracking state
+  const [foundTech, setFoundTech] = useState<{ name: string; specialty: string; rating: number; distance: string; eta: number; phone: string; avatar: string; lat: number; lng: number } | null>(null);
+  const [techLat, setTechLat] = useState(JEDDAH_LAT + 0.05);
+  const [techLng, setTechLng] = useState(JEDDAH_LNG + 0.04);
   const [etaCountdown, setEtaCountdown] = useState(0);
-  const [techPos, setTechPos] = useState({ x: 80, y: 15 });
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const techAnimRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const geoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Cleanup on close
+  // Build technician list from real API data + fallback
+  const buildTechList = useCallback(() => {
+    const apiTechs = technicians
+      .filter((t: any) => t.isAvailable)
+      .map((t: any) => ({
+        name: t.user?.fullName || "Technician",
+        specialty: t.specialization || "General",
+        rating: parseFloat(t.rating) || 4.7,
+        distance: `${(Math.random() * 3 + 0.8).toFixed(1)} km`,
+        eta: Math.floor(Math.random() * 12 + 8),
+        phone: t.user?.phone || "+966500000000",
+        avatar: (t.user?.fullName || "T").charAt(0).toUpperCase(),
+        lat: JEDDAH_LAT + (Math.random() - 0.5) * 0.1,
+        lng: JEDDAH_LNG + (Math.random() - 0.5) * 0.1,
+      }));
+    return apiTechs.length > 0 ? apiTechs : [
+      { name: "Ahmed Al-Rashidi", specialty: "Electrical", rating: 4.9, distance: "1.8 km", eta: 12, phone: "+966501234567", avatar: "A", lat: JEDDAH_LAT + 0.04, lng: JEDDAH_LNG + 0.03 },
+      { name: "Mohammed Al-Harbi", specialty: "AC & HVAC",  rating: 4.8, distance: "2.3 km", eta: 18, phone: "+966501234567", avatar: "M", lat: JEDDAH_LAT - 0.03, lng: JEDDAH_LNG + 0.05 },
+    ];
+  }, [technicians]);
+
+  // Trigger geolocation when step 2 opens
   useEffect(() => {
-    if (!isOpen) {
-      setStep(1);
-      setSelectedType(null);
-      setSelectedDistrict("");
-      setAddress("");
-      setFoundTech(null);
-      if (countdownRef.current) clearInterval(countdownRef.current);
-      if (techAnimRef.current) clearInterval(techAnimRef.current);
-    }
-  }, [isOpen]);
+    if (step === 2 && geoStatus === "idle") {
+      setGeoStatus("detecting");
+      if (!navigator.geolocation) {
+        setGeoStatus("fallback");
+        return;
+      }
+      geoRef.current = setTimeout(() => {
+        // Timeout fallback after 8s
+        setGeoStatus(s => s === "detecting" ? "fallback" : s);
+      }, 8000);
 
-  // Auto-progress step 4 → 5
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (geoRef.current) clearTimeout(geoRef.current);
+          setUserLat(pos.coords.latitude);
+          setUserLng(pos.coords.longitude);
+          setGeoStatus("success");
+          // Auto-select closest district
+          const closest = DISTRICTS.reduce((best, d) => {
+            const dist = Math.hypot(d.lat - pos.coords.latitude, d.lng - pos.coords.longitude);
+            const bestDist = Math.hypot(best.lat - pos.coords.latitude, best.lng - pos.coords.longitude);
+            return dist < bestDist ? d : best;
+          }, DISTRICTS[0]);
+          setSelectedDistrict(closest);
+        },
+        () => {
+          if (geoRef.current) clearTimeout(geoRef.current);
+          setGeoStatus("fallback");
+          // Default to Al-Safa area as fallback
+          setSelectedDistrict(DISTRICTS[0]);
+        },
+        { timeout: 7000, enableHighAccuracy: true, maximumAge: 60000 }
+      );
+    }
+  }, [step, geoStatus]);
+
+  // Auto-advance step 4 → 5
   useEffect(() => {
     if (step === 4) {
       const t = setTimeout(() => {
-        const tech = MOCK_TECHNICIANS[0];
+        const list = buildTechList();
+        const tech = list[0];
         setFoundTech(tech);
+        setTechLat(tech.lat);
+        setTechLng(tech.lng);
         setEtaCountdown(tech.eta * 60);
         setStep(5);
-      }, 3200);
+      }, 3000);
       return () => clearTimeout(t);
     }
-  }, [step]);
+  }, [step, buildTechList]);
 
-  // ETA countdown on step 6
+  // ETA countdown + technician marker animation (step 6)
   useEffect(() => {
-    if (step === 6) {
+    if (step === 6 && foundTech) {
       countdownRef.current = setInterval(() => {
         setEtaCountdown(s => (s > 0 ? s - 1 : 0));
       }, 1000);
-      // Animate technician marker toward center
       techAnimRef.current = setInterval(() => {
-        setTechPos(p => ({
-          x: p.x + (45 - p.x) * 0.04,
-          y: p.y + (48 - p.y) * 0.04,
-        }));
-      }, 100);
+        setTechLat(prev => prev + (userLat - prev) * 0.015);
+        setTechLng(prev => prev + (userLng - prev) * 0.015);
+      }, 200);
     }
     return () => {
       if (countdownRef.current) clearInterval(countdownRef.current);
       if (techAnimRef.current) clearInterval(techAnimRef.current);
     };
-  }, [step]);
+  }, [step, foundTech, userLat, userLng]);
+
+  // Reset on close
+  useEffect(() => {
+    if (!isOpen) {
+      setStep(1);
+      setSelectedType(null);
+      setSelectedDistrict(null);
+      setAddress("");
+      setGeoStatus("idle");
+      setUserLat(JEDDAH_LAT);
+      setUserLng(JEDDAH_LNG);
+      setFoundTech(null);
+      setTechLat(JEDDAH_LAT + 0.05);
+      setTechLng(JEDDAH_LNG + 0.04);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+      if (techAnimRef.current) clearInterval(techAnimRef.current);
+      if (geoRef.current) clearTimeout(geoRef.current);
+    }
+  }, [isOpen]);
+
+  const t = (en: string, bn: string, ar: string) =>
+    language === "bn" ? bn : language === "ar" ? ar : en;
 
   const getTitle = (item: typeof EMERGENCY_TYPES[0]) =>
-    language === 'bn' ? item.titleBn : language === 'ar' ? item.titleAr : item.titleEn;
+    language === "bn" ? item.titleBn : language === "ar" ? item.titleAr : item.titleEn;
   const getDesc = (item: typeof EMERGENCY_TYPES[0]) =>
-    language === 'bn' ? item.descBn : language === 'ar' ? item.descAr : item.descEn;
+    language === "bn" ? item.descBn : language === "ar" ? item.descAr : item.descEn;
 
-  const fmtEta = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+  const fmtCoord = (n: number, dir: [string, string]) =>
+    `${Math.abs(n).toFixed(4)}° ${n >= 0 ? dir[0] : dir[1]}`;
 
   const handleConfirm = async () => {
-    if (!user || !selectedType || !selectedDistrict) return;
+    if (!selectedType || !selectedDistrict) return;
+    if (!user) {
+      toast({
+        title: t("Login Required", "লগইন প্রয়োজন", "يلزم تسجيل الدخول"),
+        description: t("Please log in from your Profile to use emergency services.", "জরুরি সেবা ব্যবহার করতে প্রোফাইল থেকে লগইন করুন।", "يرجى تسجيل الدخول من ملفك الشخصي لاستخدام خدمات الطوارئ."),
+        variant: "destructive",
+      });
+      return;
+    }
     setStep(4);
     try {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate());
+      const now = new Date();
       await createBooking.mutateAsync({
         userId: user.id,
         serviceId: null,
         productId: null,
-        district: selectedDistrict,
-        address: address || selectedDistrict,
+        district: selectedDistrict.name,
+        address: address || selectedDistrict.name + ", Jeddah",
         notes: `EMERGENCY: ${selectedType.titleEn}`,
-        bookingDate: new Date().toISOString().split('T')[0],
-        bookingTime: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+        bookingDate: now.toISOString().split("T")[0],
+        bookingTime: now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
         languagePreference: language,
         totalAmountSar: "185",
         promoCode: null,
         discountSar: "0",
-      });
+        priority: "emergency",
+        locationLat: userLat.toFixed(6),
+        locationLng: userLng.toFixed(6),
+      } as any);
     } catch (_) {
-      // Continue the UX flow even if booking fails
+      // Continue the UX flow even if booking creation fails
     }
-  };
-
-  const handleGoToTracking = () => {
-    setStep(6);
-    setTechPos({ x: 80, y: 15 });
   };
 
   if (!isOpen) return null;
@@ -212,7 +428,7 @@ export function SOSModal({ isOpen, onClose }: SOSModalProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center"
+        className="fixed inset-0 z-[100] bg-black/65 backdrop-blur-sm flex items-end md:items-center justify-center"
         onClick={e => e.target === e.currentTarget && onClose()}
       >
         <motion.div
@@ -220,186 +436,251 @@ export function SOSModal({ isOpen, onClose }: SOSModalProps) {
           initial={{ y: "100%", opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: "100%", opacity: 0 }}
-          transition={{ type: "spring", stiffness: 260, damping: 28 }}
+          transition={{ type: "spring", stiffness: 280, damping: 30 }}
           className="w-full max-w-lg bg-card rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
-          style={{ maxHeight: "96vh", minHeight: "70vh", direction: isRtl ? 'rtl' : 'ltr' }}
+          style={{ maxHeight: "94vh", minHeight: "72vh", direction: isRtl ? "rtl" : "ltr" }}
         >
-          {/* Header */}
+          {/* ── Header ── */}
           <div className="flex items-center justify-between px-5 pt-5 pb-2 shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-destructive rounded-full flex items-center justify-center text-white text-xs font-bold animate-pulse">
-                SOS
-              </div>
+              <motion.div
+                className="w-9 h-9 bg-destructive rounded-full flex items-center justify-center text-white"
+                animate={{ scale: [1, 1.12, 1] }}
+                transition={{ duration: 1.6, repeat: Infinity }}
+              >
+                <Zap size={18} />
+              </motion.div>
               <div>
-                <h2 className="font-bold text-lg leading-tight">
-                  {language === 'ar' ? 'مساعدة منزلية طارئة' : language === 'bn' ? 'জরুরি হোম সাহায্য' : 'Emergency Home Help'}
+                <h2 className="font-bold text-base leading-tight">
+                  {t("Emergency Home Help", "জরুরি হোম সাহায্য", "مساعدة منزلية طارئة")}
                 </h2>
-                <p className="text-xs text-muted-foreground">
-                  {language === 'ar' ? 'خدمة طوارئ FixoSmart' : language === 'bn' ? 'FixoSmart জরুরি সেবা' : 'FixoSmart Emergency Service'}
+                <p className="text-[11px] text-muted-foreground">
+                  {t("FixoSmart Emergency · Jeddah", "FixoSmart জরুরি সেবা", "طوارئ FixoSmart · جدة")}
                 </p>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 rounded-full bg-muted hover:bg-muted/80 transition-colors">
-              <X size={18} />
+            <button
+              onClick={onClose}
+              data-testid="button-sos-close"
+              className="p-2 rounded-full bg-muted hover:bg-muted/80 transition-colors"
+            >
+              <X size={17} />
             </button>
           </div>
 
-          {/* Step progress */}
-          <div className="flex gap-1 px-5 pb-3">
-            {[1,2,3,4,5,6].map(i => (
-              <div key={i} className={`h-1 rounded-full flex-1 transition-all duration-500 ${step >= i ? 'bg-destructive' : 'bg-muted'}`} />
+          {/* ── Progress bar ── */}
+          <div className="flex gap-1 px-5 pb-3 shrink-0">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div
+                key={i}
+                className={`h-1 rounded-full flex-1 transition-all duration-500 ${step >= i ? "bg-destructive" : "bg-muted"}`}
+              />
             ))}
           </div>
 
-          {/* Scrollable content */}
-          <div className="flex-1 overflow-y-auto px-5 pb-6">
+          {/* ── Scrollable content ── */}
+          <div className="flex-1 overflow-y-auto px-5 pb-6 min-h-0">
             <AnimatePresence mode="wait">
 
-              {/* ── STEP 1: Emergency Type ── */}
+              {/* ═══ STEP 1: Emergency Type ═══ */}
               {step === 1 && (
-                <motion.div key="step1" {...slideUp}>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {language === 'ar' ? 'حدد نوع الطارئ' : language === 'bn' ? 'জরুরি সমস্যা বাছাই করুন' : 'Select your emergency type'}
+                <motion.div key="s1" {...slideUp}>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {t("Select your emergency type", "জরুরি সমস্যা বাছাই করুন", "حدد نوع الطارئ")}
                   </p>
-                  <motion.div className="space-y-3" variants={stagger} initial="initial" animate="animate">
+                  <motion.div className="space-y-2.5" variants={stagger} initial="initial" animate="animate">
                     {EMERGENCY_TYPES.map(et => (
                       <motion.button
                         key={et.id}
-                        variants={cardVariant}
+                        variants={cardItem}
+                        data-testid={`sos-type-${et.id}`}
                         onClick={() => { setSelectedType(et); setStep(2); }}
-                        className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 bg-gradient-to-r ${et.color} ${et.border} hover:scale-[1.02] active:scale-[0.98] transition-all text-${isRtl ? 'right' : 'left'}`}
+                        className={`w-full flex items-center gap-4 p-3.5 rounded-2xl border-2 bg-gradient-to-r ${et.color} ${et.border} hover:scale-[1.015] active:scale-[0.98] transition-all text-${isRtl ? "right" : "left"}`}
                       >
-                        <div className={`w-12 h-12 ${et.iconBg} rounded-2xl flex items-center justify-center text-2xl shrink-0`}>
+                        <div className={`w-11 h-11 ${et.iconBg} rounded-xl flex items-center justify-center text-xl shrink-0`}>
                           {et.icon}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm leading-tight">{getTitle(et)}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">{getDesc(et)}</p>
                         </div>
-                        <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+                        <ChevronRight size={15} className="text-muted-foreground shrink-0" />
                       </motion.button>
                     ))}
                   </motion.div>
                 </motion.div>
               )}
 
-              {/* ── STEP 2: Location ── */}
+              {/* ═══ STEP 2: Location ═══ */}
               {step === 2 && (
-                <motion.div key="step2" {...slideUp} className="space-y-5">
-                  <div className="flex items-center gap-3 p-4 rounded-2xl bg-primary/5 border border-primary/20">
-                    <MapPin size={20} className="text-primary shrink-0" />
-                    <div>
-                      <p className="font-semibold text-sm">
-                        {language === 'ar' ? 'موقعك' : language === 'bn' ? 'আপনার অবস্থান' : 'Your Location'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Jeddah, Saudi Arabia ✓</p>
-                    </div>
+                <motion.div key="s2" {...slideUp} className="space-y-4">
+
+                  {/* Map panel */}
+                  <div className="relative rounded-2xl overflow-hidden border border-border" style={{ height: 180 }}>
+                    <JeddahMap userLat={userLat} userLng={userLng} />
+
+                    {/* Geo status overlay */}
+                    {geoStatus === "detecting" && (
+                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-2 z-30">
+                        <Loader2 size={22} className="text-blue-400 animate-spin" />
+                        <p className="text-white text-xs font-medium">
+                          {t("Detecting your location…", "অবস্থান শনাক্ত হচ্ছে…", "جارٍ تحديد موقعك…")}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Status badge */}
+                    {(geoStatus === "success" || geoStatus === "fallback") && (
+                      <div className={`absolute top-2 right-2 z-20 flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-semibold backdrop-blur-sm border ${
+                        geoStatus === "success"
+                          ? "bg-green-500/20 border-green-400/30 text-green-300"
+                          : "bg-amber-500/20 border-amber-400/30 text-amber-300"
+                      }`}>
+                        {geoStatus === "success" ? (
+                          <><LocateFixed size={10} /> {t("GPS Located", "GPS শনাক্ত", "تم تحديد GPS")}</>
+                        ) : (
+                          <><MapPin size={10} /> {t("Jeddah Area", "জেদ্দা অঞ্চল", "منطقة جدة")}</>
+                        )}
+                      </div>
+                    )}
                   </div>
 
+                  {/* Coordinates display */}
+                  {(geoStatus === "success" || geoStatus === "fallback") && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/5 border border-primary/20 text-xs">
+                      <Crosshair size={13} className="text-primary shrink-0" />
+                      <span className="text-muted-foreground">
+                        {fmtCoord(userLat, ["N", "S"])} &nbsp;|&nbsp; {fmtCoord(userLng, ["E", "W"])}
+                      </span>
+                      {geoStatus === "fallback" && (
+                        <span className="ml-auto text-amber-500">
+                          {t("(estimated)", "(আনুমানিক)", "(تقريبي)")}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* District grid */}
                   <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      {language === 'ar' ? 'اختر الحي' : language === 'bn' ? 'এলাকা বেছে নিন' : 'Select District'}
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      {t("Select District", "এলাকা বেছে নিন", "اختر الحي")}
                     </p>
                     <div className="grid grid-cols-3 gap-2">
                       {DISTRICTS.map(d => (
                         <button
-                          key={d}
+                          key={d.name}
+                          data-testid={`sos-district-${d.name.replace(/\s+/g, "-").toLowerCase()}`}
                           onClick={() => setSelectedDistrict(d)}
-                          className={`py-2.5 px-2 rounded-xl text-xs font-medium border-2 transition-all ${
-                            selectedDistrict === d
-                              ? 'bg-destructive text-white border-destructive scale-[1.03]'
-                              : 'border-border hover:border-destructive/50 hover:bg-destructive/5'
+                          className={`py-2 px-2 rounded-xl text-xs font-medium border-2 transition-all ${
+                            selectedDistrict?.name === d.name
+                              ? "bg-destructive text-white border-destructive scale-[1.04]"
+                              : "border-border hover:border-destructive/40 hover:bg-destructive/5"
                           }`}
                         >
-                          {d}
+                          {d.name}
                         </button>
                       ))}
                     </div>
                   </div>
 
+                  {/* Manual address */}
                   <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      {language === 'ar' ? 'أدخل العنوان' : language === 'bn' ? 'ঠিকানা লিখুন' : 'Manual Address (optional)'}
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      {t("Building / Apartment (optional)", "ভবন / অ্যাপার্টমেন্ট (ঐচ্ছিক)", "المبنى / الشقة (اختياري)")}
                     </p>
                     <input
                       type="text"
+                      data-testid="input-sos-address"
                       value={address}
                       onChange={e => setAddress(e.target.value)}
-                      placeholder={language === 'ar' ? 'مثال: شقة 4، برج النور، الصفا' : 'e.g. Apt 4, Al-Nour Tower, Al-Safa'}
+                      placeholder={language === "ar" ? "مثال: شقة 4، برج النور" : "e.g. Apt 4, Al-Nour Tower"}
                       className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:border-destructive outline-none text-sm transition-colors"
                     />
                   </div>
 
                   <button
+                    data-testid="button-sos-continue"
                     onClick={() => selectedDistrict && setStep(3)}
-                    disabled={!selectedDistrict}
-                    className="w-full py-4 bg-destructive text-white font-bold rounded-2xl disabled:opacity-40 hover:bg-destructive/90 active:scale-[0.98] transition-all shadow-lg shadow-destructive/30"
+                    disabled={!selectedDistrict || geoStatus === "detecting"}
+                    className="w-full py-3.5 bg-destructive text-white font-bold rounded-2xl disabled:opacity-40 hover:bg-destructive/90 active:scale-[0.98] transition-all shadow-lg shadow-destructive/30"
                   >
-                    {language === 'ar' ? 'التالي' : language === 'bn' ? 'পরবর্তী' : 'Continue →'}
+                    {geoStatus === "detecting" ? (
+                      <Loader2 size={18} className="animate-spin mx-auto" />
+                    ) : (
+                      t("Confirm Location →", "অবস্থান নিশ্চিত করুন →", "تأكيد الموقع →")
+                    )}
                   </button>
                 </motion.div>
               )}
 
-              {/* ── STEP 3: Confirmation ── */}
-              {step === 3 && selectedType && (
-                <motion.div key="step3" {...slideUp} className="space-y-4">
+              {/* ═══ STEP 3: Confirmation ═══ */}
+              {step === 3 && selectedType && selectedDistrict && (
+                <motion.div key="s3" {...slideUp} className="space-y-4">
+                  {/* Emergency banner */}
+                  <div className="flex items-center gap-2 py-2 px-3 rounded-xl bg-destructive/10 border border-destructive/30">
+                    <AlertTriangle size={15} className="text-destructive shrink-0" />
+                    <span className="text-sm font-bold text-destructive">
+                      {t("PRIORITY: EMERGENCY", "অগ্রাধিকার: জরুরি", "أولوية: طارئة")}
+                    </span>
+                  </div>
+
                   {/* Summary card */}
-                  <div className="rounded-2xl bg-muted/50 border border-border overflow-hidden">
-                    <div className="px-4 py-3 bg-destructive/10 border-b border-border flex items-center gap-2">
-                      <AlertTriangle size={16} className="text-destructive" />
-                      <span className="text-sm font-bold text-destructive">
-                        {language === 'ar' ? 'أولوية الطوارئ' : language === 'bn' ? 'জরুরি অগ্রাধিকার' : 'Emergency Priority'}
-                      </span>
+                  <div className="rounded-2xl border border-border overflow-hidden">
+                    <div className="bg-muted/40 px-4 py-2.5 border-b border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      {t("Booking Summary", "বুকিং সারসংক্ষেপ", "ملخص الحجز")}
                     </div>
                     <div className="p-4 space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">
-                          {language === 'ar' ? 'المشكلة' : language === 'bn' ? 'সমস্যা' : 'Problem'}
-                        </span>
-                        <span className="text-sm font-semibold flex items-center gap-1.5">
+                      <Row label={t("Problem", "সমস্যা", "المشكلة")}>
+                        <span className="flex items-center gap-1.5 font-semibold text-sm">
                           <span>{selectedType.icon}</span>
-                          <span className="truncate max-w-[160px]">{getTitle(selectedType)}</span>
+                          <span className="truncate max-w-[140px]">{getTitle(selectedType)}</span>
                         </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">
-                          {language === 'ar' ? 'المنطقة' : language === 'bn' ? 'এলাকা' : 'Location'}
+                      </Row>
+                      <Row label={t("District", "এলাকা", "المنطقة")}>
+                        <span className="flex items-center gap-1 font-semibold text-sm">
+                          <MapPin size={11} className="text-destructive" />{selectedDistrict.name}
                         </span>
-                        <span className="text-sm font-semibold flex items-center gap-1"><MapPin size={12} />{selectedDistrict}</span>
-                      </div>
+                      </Row>
                       {address && (
-                        <div className="flex justify-between items-start">
-                          <span className="text-sm text-muted-foreground">
-                            {language === 'ar' ? 'العنوان' : language === 'bn' ? 'ঠিকানা' : 'Address'}
-                          </span>
-                          <span className="text-sm font-semibold text-right max-w-[160px]">{address}</span>
-                        </div>
+                        <Row label={t("Address", "ঠিকানা", "العنوان")}>
+                          <span className="font-semibold text-sm text-right max-w-[140px]">{address}</span>
+                        </Row>
                       )}
+                      <Row label={t("Coordinates", "স্থানাঙ্ক", "الإحداثيات")}>
+                        <span className="text-xs text-muted-foreground font-mono">
+                          {userLat.toFixed(4)}, {userLng.toFixed(4)}
+                        </span>
+                      </Row>
                     </div>
                   </div>
 
                   {/* ETA + Price */}
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl bg-primary/5 border border-primary/20 p-4 text-center">
-                      <Clock size={20} className="mx-auto mb-1.5 text-primary" />
-                      <p className="text-lg font-bold">15–25</p>
+                    <div className="rounded-2xl bg-primary/5 border border-primary/20 p-3.5 text-center">
+                      <Clock size={18} className="mx-auto mb-1 text-primary" />
+                      <p className="text-xl font-bold">15–25</p>
                       <p className="text-xs text-muted-foreground">
-                        {language === 'ar' ? 'دقائق للوصول' : language === 'bn' ? 'মিনিটে পৌঁছাবে' : 'min arrival'}
+                        {t("min arrival", "মিনিটে পৌঁছাবে", "دقائق للوصول")}
                       </p>
                     </div>
-                    <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4 text-center">
-                      <span className="text-xl font-bold block mb-1">💰</span>
-                      <p className="text-lg font-bold">120–250</p>
+                    <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-3.5 text-center">
+                      <span className="text-xl block mb-1">💰</span>
+                      <p className="text-xl font-bold">120–250</p>
                       <p className="text-xs text-muted-foreground">SAR estimated</p>
                     </div>
                   </div>
 
                   <p className="text-xs text-muted-foreground text-center">
-                    {language === 'ar' ? 'سيتصل بك الفني عند التأكيد' : language === 'bn' ? 'নিশ্চিত করার পর টেকনিশিয়ান যোগাযোগ করবে' : 'Technician will contact you upon confirmation'}
+                    {t(
+                      "Technician will contact you immediately after dispatch",
+                      "ডিসপ্যাচের পরে টেকনিশিয়ান অবিলম্বে যোগাযোগ করবে",
+                      "سيتصل بك الفني فور إرسال الطلب"
+                    )}
                   </p>
 
                   <motion.button
                     whileTap={{ scale: 0.97 }}
+                    data-testid="button-sos-request"
                     onClick={handleConfirm}
                     disabled={createBooking.isPending}
                     className="w-full py-4 bg-destructive text-white font-bold text-base rounded-2xl shadow-lg shadow-destructive/40 hover:bg-destructive/90 transition-all flex items-center justify-center gap-2"
@@ -407,51 +688,53 @@ export function SOSModal({ isOpen, onClose }: SOSModalProps) {
                     {createBooking.isPending ? (
                       <Loader2 size={20} className="animate-spin" />
                     ) : (
-                      <>
-                        <Zap size={18} />
-                        {language === 'ar' ? 'طلب فني طارئ' : language === 'bn' ? 'জরুরি টেকনিশিয়ান অনুরোধ' : 'Request Emergency Technician'}
-                      </>
+                      <><Zap size={18} />{t("Request Emergency Technician", "জরুরি টেকনিশিয়ান অনুরোধ", "طلب فني طارئ")}</>
                     )}
                   </motion.button>
 
-                  <button onClick={() => setStep(2)} className="w-full text-center text-sm text-muted-foreground py-2 hover:text-foreground transition-colors">
-                    ← {language === 'ar' ? 'عدّل الموقع' : language === 'bn' ? 'পরিবর্তন করুন' : 'Change location'}
+                  <button onClick={() => setStep(2)} className="w-full text-center text-sm text-muted-foreground py-1 hover:text-foreground transition-colors">
+                    ← {t("Change location", "অবস্থান পরিবর্তন", "تعديل الموقع")}
                   </button>
                 </motion.div>
               )}
 
-              {/* ── STEP 4: Searching (radar) ── */}
+              {/* ═══ STEP 4: Searching (Radar) ═══ */}
               {step === 4 && (
-                <motion.div key="step4" {...slideUp} className="flex flex-col items-center justify-center py-8 space-y-6">
-                  {/* Radar animation */}
+                <motion.div key="s4" {...slideUp} className="flex flex-col items-center justify-center py-10 space-y-6">
                   <div className="relative w-36 h-36 flex items-center justify-center">
                     {[1, 2, 3].map(i => (
                       <motion.div
                         key={i}
-                        className="absolute rounded-full border-2 border-destructive/40"
-                        initial={{ width: 40, height: 40, opacity: 0.8 }}
+                        className="absolute rounded-full border-2 border-destructive/35"
+                        initial={{ width: 44, height: 44, opacity: 0.8 }}
                         animate={{ width: 144, height: 144, opacity: 0 }}
-                        transition={{ duration: 2, delay: i * 0.65, repeat: Infinity, ease: "easeOut" }}
+                        transition={{ duration: 2.2, delay: i * 0.7, repeat: Infinity, ease: "easeOut" }}
                       />
                     ))}
-                    <div className="w-14 h-14 bg-destructive rounded-full flex items-center justify-center shadow-lg shadow-destructive/50 z-10">
-                      <Navigation size={26} className="text-white" />
-                    </div>
+                    <motion.div
+                      className="w-14 h-14 bg-destructive rounded-full flex items-center justify-center shadow-lg shadow-destructive/50 z-10"
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                    >
+                      <Radio size={24} className="text-white" />
+                    </motion.div>
                   </div>
-                  <div className="text-center space-y-2">
+                  <div className="text-center space-y-1.5">
                     <p className="text-lg font-bold">
-                      {language === 'ar' ? 'جارٍ البحث عن أقرب فني...' : language === 'bn' ? 'নিকটতম টেকনিশিয়ান খোঁজা হচ্ছে...' : 'Finding nearest technician...'}
+                      {t("Finding nearest technician…", "নিকটতম টেকনিশিয়ান খোঁজা হচ্ছে…", "جارٍ البحث عن أقرب فني…")}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {language === 'ar' ? `بناءً على موقعك في ${selectedDistrict}` : language === 'bn' ? `${selectedDistrict} এলাকায় খোঁজা হচ্ছে` : `Searching in ${selectedDistrict} area`}
+                      {selectedDistrict
+                        ? t(`Searching in ${selectedDistrict.name}`, `${selectedDistrict.name} এলাকায় খোঁজা হচ্ছে`, `البحث في ${selectedDistrict.name}`)
+                        : t("Searching nearby…", "কাছাকাছি খোঁজা হচ্ছে…", "البحث بالقرب…")}
                     </p>
-                    <div className="flex justify-center gap-1.5 mt-3">
-                      {[0,1,2].map(i => (
+                    <div className="flex justify-center gap-1.5 pt-2">
+                      {[0, 1, 2].map(i => (
                         <motion.div
                           key={i}
                           className="w-2 h-2 bg-destructive rounded-full"
-                          animate={{ y: [0, -8, 0] }}
-                          transition={{ duration: 0.7, delay: i * 0.2, repeat: Infinity }}
+                          animate={{ y: [0, -7, 0] }}
+                          transition={{ duration: 0.65, delay: i * 0.2, repeat: Infinity }}
                         />
                       ))}
                     </div>
@@ -459,138 +742,122 @@ export function SOSModal({ isOpen, onClose }: SOSModalProps) {
                 </motion.div>
               )}
 
-              {/* ── STEP 5: Technician Found ── */}
+              {/* ═══ STEP 5: Technician Found ═══ */}
               {step === 5 && foundTech && (
-                <motion.div key="step5" {...slideUp} className="space-y-5">
-                  {/* Success badge */}
+                <motion.div key="s5" {...slideUp} className="space-y-4">
                   <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 20, delay: 0.1 }}
-                    className="flex items-center justify-center gap-2 py-2.5 px-4 bg-green-500/10 border border-green-500/30 rounded-2xl mx-auto w-fit"
+                    transition={{ type: "spring", stiffness: 380, damping: 22, delay: 0.1 }}
+                    className="flex items-center justify-center gap-2 py-2.5 px-4 bg-green-500/10 border border-green-500/30 rounded-2xl"
                   >
-                    <CheckCircle size={16} className="text-green-600" />
-                    <span className="text-sm font-semibold text-green-700 dark:text-green-400">
-                      {language === 'ar' ? 'تم العثور على فني!' : language === 'bn' ? 'টেকনিশিয়ান পাওয়া গেছে!' : 'Technician Found!'}
+                    <CheckCircle size={15} className="text-green-600" />
+                    <span className="text-sm font-bold text-green-700 dark:text-green-400">
+                      {t("Technician Found!", "টেকনিশিয়ান পাওয়া গেছে!", "تم العثور على فني!")}
                     </span>
                   </motion.div>
 
                   {/* Technician card */}
                   <motion.div
-                    initial={{ opacity: 0, y: 30 }}
+                    initial={{ opacity: 0, y: 24 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2, type: "spring", stiffness: 300, damping: 28 }}
-                    className="rounded-2xl border-2 border-primary/30 bg-primary/5 p-5"
+                    transition={{ delay: 0.18, type: "spring", stiffness: 300, damping: 28 }}
+                    className="rounded-2xl border-2 border-primary/25 bg-primary/5 p-4"
                   >
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center text-primary-foreground text-2xl font-bold shrink-0">
                         {foundTech.avatar}
                       </div>
-                      <div className="flex-1">
-                        <p className="font-bold text-base">{foundTech.name}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-base truncate">{foundTech.name}</p>
                         <p className="text-sm text-muted-foreground">{foundTech.specialty}</p>
                         <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                           <span className="flex items-center gap-0.5 text-sm font-semibold">
-                            <Star size={13} className="fill-amber-400 text-amber-400" /> {foundTech.rating}
+                            <Star size={12} className="fill-amber-400 text-amber-400" />{foundTech.rating.toFixed(1)}
                           </span>
                           <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                            <MapPin size={11} /> {foundTech.distance}
+                            <MapPin size={10} />{foundTech.distance}
                           </span>
-                          <span className="text-xs font-semibold text-primary flex items-center gap-0.5">
-                            <Clock size={11} /> ~{foundTech.eta} min
+                          <span className="text-xs font-bold text-primary flex items-center gap-0.5">
+                            <Clock size={10} />~{foundTech.eta} {t("min", "মিনিট", "دقيقة")}
                           </span>
                         </div>
                       </div>
                     </div>
-
-                    {/* Action buttons */}
-                    <div className="flex gap-2 mt-4">
-                      <a href={`tel:+966500000000`} className="flex-1 py-2.5 rounded-xl bg-primary/10 hover:bg-primary/20 flex items-center justify-center gap-2 text-sm font-semibold text-primary transition-colors">
-                        <Phone size={15} /> {language === 'ar' ? 'اتصل' : language === 'bn' ? 'কল' : 'Call'}
+                    <div className="flex gap-2 mt-3.5">
+                      <a
+                        href={`tel:${foundTech.phone}`}
+                        data-testid="link-sos-call"
+                        className="flex-1 py-2.5 rounded-xl bg-primary/10 hover:bg-primary/20 flex items-center justify-center gap-2 text-sm font-semibold text-primary transition-colors"
+                      >
+                        <Phone size={14} />{t("Call", "কল", "اتصل")}
                       </a>
-                      <a href={`https://wa.me/966500000000`} target="_blank" rel="noreferrer" className="flex-1 py-2.5 rounded-xl bg-green-500/10 hover:bg-green-500/20 flex items-center justify-center gap-2 text-sm font-semibold text-green-700 dark:text-green-400 transition-colors">
-                        <MessageCircle size={15} /> WhatsApp
+                      <a
+                        href={`https://wa.me/${foundTech.phone.replace(/\D/g, "")}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        data-testid="link-sos-whatsapp"
+                        className="flex-1 py-2.5 rounded-xl bg-green-500/10 hover:bg-green-500/20 flex items-center justify-center gap-2 text-sm font-semibold text-green-700 dark:text-green-400 transition-colors"
+                      >
+                        <MessageCircle size={14} />WhatsApp
                       </a>
                     </div>
                   </motion.div>
 
                   <motion.button
                     whileTap={{ scale: 0.97 }}
-                    onClick={handleGoToTracking}
-                    className="w-full py-4 bg-primary text-primary-foreground font-bold rounded-2xl shadow-lg shadow-primary/30 hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                    data-testid="button-sos-track"
+                    onClick={() => setStep(6)}
+                    className="w-full py-3.5 bg-primary text-primary-foreground font-bold rounded-2xl shadow-lg shadow-primary/30 hover:opacity-90 transition-all flex items-center justify-center gap-2"
                   >
-                    <Navigation size={18} />
-                    {language === 'ar' ? 'تتبع الفني' : language === 'bn' ? 'লাইভ ট্র্যাক করুন' : 'Track Technician Live'}
+                    <Navigation size={17} />{t("Track Technician Live", "লাইভ ট্র্যাক করুন", "تتبع الفني مباشرة")}
                   </motion.button>
                 </motion.div>
               )}
 
-              {/* ── STEP 6: Live Tracking ── */}
+              {/* ═══ STEP 6: Live Tracking ═══ */}
               {step === 6 && foundTech && (
-                <motion.div key="step6" {...slideUp} className="space-y-4">
-                  {/* Simulated map */}
-                  <div className="relative h-52 rounded-2xl overflow-hidden border border-border bg-gradient-to-br from-slate-100 to-blue-50 dark:from-slate-800 dark:to-blue-950">
-                    {/* Map grid lines */}
-                    <svg className="absolute inset-0 w-full h-full opacity-20" xmlns="http://www.w3.org/2000/svg">
-                      <defs>
-                        <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
-                          <path d="M 30 0 L 0 0 0 30" fill="none" stroke="currentColor" strokeWidth="0.5" />
-                        </pattern>
-                      </defs>
-                      <rect width="100%" height="100%" fill="url(#grid)" />
-                    </svg>
-                    {/* Road lines */}
-                    <div className="absolute inset-0 opacity-30">
-                      <div className="absolute bg-slate-400 dark:bg-slate-500" style={{top:'30%',left:0,right:0,height:2}} />
-                      <div className="absolute bg-slate-400 dark:bg-slate-500" style={{top:'60%',left:0,right:0,height:2}} />
-                      <div className="absolute bg-slate-400 dark:bg-slate-500" style={{top:0,bottom:0,left:'35%',width:2}} />
-                      <div className="absolute bg-slate-400 dark:bg-slate-500" style={{top:0,bottom:0,left:'65%',width:2}} />
-                    </div>
-                    {/* Customer pin (center) */}
-                    <div className="absolute" style={{left:'45%',top:'45%',transform:'translate(-50%,-50%)'}}>
-                      <div className="relative">
-                        <div className="w-5 h-5 bg-primary rounded-full border-3 border-white shadow-lg z-10 relative" />
-                        <div className="absolute inset-0 bg-primary/30 rounded-full animate-ping" />
-                      </div>
-                    </div>
-                    {/* Technician marker */}
-                    <motion.div
-                      className="absolute"
-                      animate={{ left: `${techPos.x}%`, top: `${techPos.y}%` }}
-                      transition={{ duration: 0.5, ease: "linear" }}
-                      style={{ transform: 'translate(-50%,-50%)' }}
-                    >
-                      <div className="w-8 h-8 bg-destructive rounded-full flex items-center justify-center shadow-lg shadow-destructive/40 border-2 border-white">
-                        <Zap size={14} className="text-white" />
-                      </div>
-                    </motion.div>
-                    {/* ETA badge */}
-                    <div className="absolute top-3 left-3 bg-card/90 backdrop-blur rounded-xl px-3 py-1.5 shadow-sm border border-border flex items-center gap-1.5">
-                      <Clock size={13} className="text-primary" />
-                      <span className="font-mono font-bold text-sm">{fmtEta(etaCountdown)}</span>
-                      <span className="text-xs text-muted-foreground">{language === 'ar' ? 'متبقي' : language === 'bn' ? 'বাকি' : 'ETA'}</span>
-                    </div>
+                <motion.div key="s6" {...slideUp} className="space-y-3">
+                  {/* Live map */}
+                  <div className="relative rounded-2xl overflow-hidden border border-border" style={{ height: 210 }}>
+                    <JeddahMap
+                      userLat={userLat}
+                      userLng={userLng}
+                      techLat={techLat}
+                      techLng={techLng}
+                      showTech
+                      etaSec={etaCountdown}
+                    />
                   </div>
 
                   {/* Technician mini card */}
                   <div className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card">
-                    <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-primary-foreground font-bold shrink-0">
+                    <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-primary-foreground font-bold text-lg shrink-0">
                       {foundTech.avatar}
                     </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-sm">{foundTech.name}</p>
-                      <div className="flex items-center gap-2">
-                        <Star size={11} className="fill-amber-400 text-amber-400" />
-                        <span className="text-xs">{foundTech.rating}</span>
-                        <span className="text-xs text-muted-foreground">· {foundTech.specialty}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate">{foundTech.name}</p>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Star size={10} className="fill-amber-400 text-amber-400" />
+                        {foundTech.rating.toFixed(1)}
+                        <span>·</span>
+                        {foundTech.specialty}
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <a href="tel:+966500000000" className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center text-primary hover:bg-primary/20 transition-colors">
-                        <Phone size={15} />
+                    <div className="flex gap-1.5">
+                      <a
+                        href={`tel:${foundTech.phone}`}
+                        className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center text-primary hover:bg-primary/20 transition-colors"
+                      >
+                        <Phone size={14} />
                       </a>
-                      <a href="https://wa.me/966500000000" target="_blank" rel="noreferrer" className="w-9 h-9 bg-green-500/10 rounded-xl flex items-center justify-center text-green-700 dark:text-green-400 hover:bg-green-500/20 transition-colors">
-                        <MessageCircle size={15} />
+                      <a
+                        href={`https://wa.me/${foundTech.phone.replace(/\D/g, "")}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-9 h-9 bg-green-500/10 rounded-xl flex items-center justify-center text-green-700 dark:text-green-400 hover:bg-green-500/20 transition-colors"
+                      >
+                        <MessageCircle size={14} />
                       </a>
                     </div>
                   </div>
@@ -600,18 +867,22 @@ export function SOSModal({ isOpen, onClose }: SOSModalProps) {
                     <motion.div
                       className="w-2.5 h-2.5 bg-green-500 rounded-full shrink-0"
                       animate={{ opacity: [1, 0.3, 1] }}
-                      transition={{ duration: 1.2, repeat: Infinity }}
+                      transition={{ duration: 1.1, repeat: Infinity }}
                     />
                     <p className="text-sm font-semibold text-green-700 dark:text-green-400">
-                      {language === 'ar' ? 'الفني في طريقه إليك' : language === 'bn' ? 'টেকনিশিয়ান আসছেন...' : 'Technician is on the way to you'}
+                      {t("Technician is on the way to you", "টেকনিশিয়ান আসছেন…", "الفني في طريقه إليك")}
                     </p>
+                    <span className="ml-auto font-mono text-sm font-bold text-primary">
+                      {Math.floor(etaCountdown / 60)}:{String(etaCountdown % 60).padStart(2, "0")}
+                    </span>
                   </div>
 
                   <button
+                    data-testid="button-sos-close-tracking"
                     onClick={onClose}
                     className="w-full py-3 rounded-xl border-2 border-border text-sm font-medium hover:bg-muted transition-colors text-muted-foreground"
                   >
-                    {language === 'ar' ? 'إغلاق وإبقائه في الخلفية' : language === 'bn' ? 'বন্ধ করুন (ব্যাকগ্রাউন্ডে চলবে)' : 'Close & track in background'}
+                    {t("Close & track in background", "বন্ধ করুন (ব্যাকগ্রাউন্ডে চলবে)", "إغلاق والتتبع في الخلفية")}
                   </button>
                 </motion.div>
               )}
@@ -621,5 +892,15 @@ export function SOSModal({ isOpen, onClose }: SOSModalProps) {
         </motion.div>
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+// ── Helper row component ────────────────────────────────────────────────────
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex justify-between items-center gap-2">
+      <span className="text-sm text-muted-foreground shrink-0">{label}</span>
+      <div className="text-right">{children}</div>
+    </div>
   );
 }
