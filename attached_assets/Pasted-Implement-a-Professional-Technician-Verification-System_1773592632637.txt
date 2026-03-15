@@ -1,0 +1,148 @@
+Implement a Professional Technician Verification System in the Fixosmart platform.
+
+Technicians must pass a verification process before they are approved by the admin.
+
+Do not allow technicians to access the technician dashboard until verification is complete and approved.
+
+---
+
+## TECHNICIAN VERIFICATION PROCESS
+
+When a new technician registers, redirect them to a Technician Verification Form.
+
+Technicians must submit the following information:
+
+Personal Information
+
+* Full Name
+* Phone Number
+* Email
+* City / Location
+
+Professional Information
+
+* Service Specialization
+* Years of Experience
+* Skills List
+* Short Bio
+
+Verification Documents
+
+* Government ID Upload
+* Work Certificate Upload
+* Portfolio Images of Previous Work
+* Profile Photo
+
+Optional
+
+* Video introduction (short video upload)
+
+---
+
+## VERIFICATION STATUS SYSTEM
+
+Add a field to Users table:
+
+verification_status
+
+Values:
+
+pending
+under_review
+approved
+rejected
+
+Default status when technician applies:
+
+pending
+
+---
+
+## ADMIN VERIFICATION PANEL
+
+Create a new section in the Admin Dashboard:
+
+Technician Verification Center
+
+Admin should see a list of technician applications showing:
+
+* Technician Name
+* Specialization
+* Experience
+* Location
+* Verification Status
+* Application Date
+
+Admin must be able to:
+
+View Full Application
+Preview Uploaded Documents
+Preview Portfolio Images
+
+Admin actions:
+
+Approve Technician
+Reject Technician
+Request More Information
+
+---
+
+## VERIFICATION SCORING SYSTEM
+
+Allow admin to rate technician quality with a score system.
+
+Score categories:
+
+Experience Score
+Portfolio Quality
+Document Verification
+Communication
+
+Each score from 1 to 5.
+
+Display total technician score.
+
+---
+
+## TECHNICIAN ACCESS CONTROL
+
+Technician dashboard access rule:
+
+If verification_status != approved
+
+redirect to Verification Status Page.
+
+Verification Status Page should display:
+
+Pending Review
+Under Review
+Rejected
+Approved
+
+---
+
+## TRUST BADGE SYSTEM
+
+Approved technicians receive a badge:
+
+Verified Technician
+
+Display this badge on:
+
+Technician profile
+Service listings
+Booking page
+
+---
+
+## OUTPUT
+
+Provide:
+
+1. technician verification form UI
+2. database updates
+3. admin verification dashboard
+4. document upload system
+5. verification status page
+6. access control logic
+7. explanation of verification workflow

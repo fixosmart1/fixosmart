@@ -3,7 +3,7 @@ import { useAdminAnalytics } from "@/hooks/use-api";
 import { Link } from "wouter";
 import {
   LayoutDashboard, Users, Calendar, Wrench, ShoppingBag, TrendingUp,
-  CheckCircle, Clock, AlertCircle, DollarSign, Settings
+  CheckCircle, Clock, AlertCircle, DollarSign, Settings, ShieldCheck
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -18,6 +18,7 @@ export function AdminDashboard() {
     { label: "Technicians", value: analytics?.totalTechnicians ?? 0, icon: Wrench, color: "text-amber-500", bg: "bg-amber-500/10" },
     { label: t('pending_bookings'), value: analytics?.pendingBookings ?? 0, icon: Clock, color: "text-orange-500", bg: "bg-orange-500/10" },
     { label: t('completed_bookings'), value: analytics?.completedBookings ?? 0, icon: CheckCircle, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Pending Verifications", value: analytics?.pendingVerifications ?? 0, icon: ShieldCheck, color: "text-rose-500", bg: "bg-rose-500/10" },
   ];
 
   const quickLinks = [
@@ -25,6 +26,7 @@ export function AdminDashboard() {
     { href: "/admin/bookings", icon: Calendar, label: t('manage_bookings'), color: "bg-purple-500/10 border-purple-500/20" },
     { href: "/admin/services", icon: Wrench, label: t('manage_services'), color: "bg-green-500/10 border-green-500/20" },
     { href: "/admin/products", icon: ShoppingBag, label: t('manage_products'), color: "bg-amber-500/10 border-amber-500/20" },
+    { href: "/admin/verifications", icon: ShieldCheck, label: "Verification Center", color: "bg-rose-500/10 border-rose-500/20" },
     { href: "/admin/settings", icon: Settings, label: "Site Settings", color: "bg-slate-500/10 border-slate-500/20" },
   ];
 

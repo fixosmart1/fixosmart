@@ -3,11 +3,13 @@ import { eq, desc, sql, avg } from "drizzle-orm";
 import {
   users, services, products, bookings, technicians,
   reviews, iqamaTrackers, subscriptions, promoCodes, siteSettings,
+  technicianVerifications,
   type User, type InsertUser,
   type Service, type InsertService,
   type Product, type InsertProduct,
   type Booking, type InsertBooking,
   type Technician, type InsertTechnician,
+  type TechnicianVerification, type InsertTechnicianVerification,
   type Review, type InsertReview,
   type IqamaTracker, type InsertIqamaTracker,
   type Subscription, type InsertSubscription,
@@ -19,7 +21,7 @@ export interface IStorage {
   // USERS
   getUser(id: number): Promise<User | undefined>;
   getOrCreateUserByFullName(fullName: string, role?: string, email?: string): Promise<User>;
-  updateUser(id: number, data: Partial<Pick<InsertUser, 'fullName' | 'email' | 'phone' | 'profilePhoto' | 'language'>>): Promise<User>;
+  updateUser(id: number, data: Partial<Pick<InsertUser, 'fullName' | 'email' | 'phone' | 'profilePhoto' | 'language' | 'verificationStatus'>>): Promise<User>;
   getAllUsers(): Promise<User[]>;
   updateUserRole(id: number, role: string): Promise<User>;
   suspendUser(id: number, suspended: boolean): Promise<User>;
@@ -55,6 +57,12 @@ export interface IStorage {
   getAllTechniciansWithUsers(): Promise<any[]>;
   updateTechnicianRating(technicianId: number): Promise<void>;
 
+  // VERIFICATION
+  getVerificationByUserId(userId: number): Promise<TechnicianVerification | undefined>;
+  getAllVerifications(): Promise<any[]>;
+  createVerification(data: InsertTechnicianVerification): Promise<TechnicianVerification>;
+  updateVerification(id: number, data: Partial<TechnicianVerification>): Promise<TechnicianVerification>;
+
   // REVIEWS
   getReviews(): Promise<Review[]>;
   getReviewsByTechnicianId(technicianId: number): Promise<Review[]>;
@@ -75,7 +83,7 @@ export interface IStorage {
   createPromoCode(promo: InsertPromoCode): Promise<PromoCode>;
 
   // ANALYTICS
-  getAnalytics(): Promise<{ totalBookings: number; totalRevenue: number; totalUsers: number; totalTechnicians: number; pendingBookings: number; completedBookings: number }>;
+  getAnalytics(): Promise<{ totalBookings: number; totalRevenue: number; totalUsers: number; totalTechnicians: number; pendingBookings: number; completedBookings: number; pendingVerifications: number }>;
 
   // SITE SETTINGS
   getSiteSettings(): Promise<SiteSetting[]>;
@@ -97,7 +105,7 @@ export class DatabaseStorage implements IStorage {
     return u;
   }
 
-  async updateUser(id: number, data: Partial<Pick<InsertUser, 'fullName' | 'email' | 'phone' | 'profilePhoto' | 'language'>>) {
+  async updateUser(id: number, data: Partial<Pick<InsertUser, 'fullName' | 'email' | 'phone' | 'profilePhoto' | 'language' | 'verificationStatus'>>) {
     const [u] = await db.update(users).set(data).where(eq(users.id, id)).returning();
     return u;
   }
@@ -263,6 +271,35 @@ export class DatabaseStorage implements IStorage {
       .where(eq(technicians.id, technicianId));
   }
 
+  // VERIFICATION
+  async getVerificationByUserId(userId: number) {
+    const [v] = await db.select().from(technicianVerifications).where(eq(technicianVerifications.userId, userId));
+    return v;
+  }
+
+  async getAllVerifications() {
+    const verifs = await db.select().from(technicianVerifications).orderBy(desc(technicianVerifications.createdAt));
+    const userIds = [...new Set(verifs.map(v => v.userId))];
+    const userList = userIds.length > 0
+      ? await db.select().from(users).where(sql`${users.id} = ANY(ARRAY[${sql.join(userIds.map(id => sql`${id}`), sql`, `)}]::int[])`)
+      : [];
+    const userMap = Object.fromEntries(userList.map(u => [u.id, u]));
+    return verifs.map(v => ({ ...v, user: userMap[v.userId] || null }));
+  }
+
+  async createVerification(data: InsertTechnicianVerification) {
+    const [v] = await db.insert(technicianVerifications).values(data).returning();
+    return v;
+  }
+
+  async updateVerification(id: number, data: Partial<TechnicianVerification>) {
+    const [v] = await db.update(technicianVerifications)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(technicianVerifications.id, id))
+      .returning();
+    return v;
+  }
+
   async getReviews() { return db.select().from(reviews).orderBy(desc(reviews.createdAt)); }
 
   async getReviewsByTechnicianId(technicianId: number) {
@@ -315,6 +352,7 @@ export class DatabaseStorage implements IStorage {
     const allBookings = await db.select().from(bookings);
     const allUsers = await db.select().from(users);
     const allTechs = await db.select().from(technicians);
+    const allVerifs = await db.select().from(technicianVerifications);
     const totalRevenue = allBookings
       .filter(b => b.status === 'completed')
       .reduce((sum, b) => sum + Number(b.totalAmountSar || 0), 0);
@@ -325,6 +363,7 @@ export class DatabaseStorage implements IStorage {
       totalTechnicians: allTechs.length,
       pendingBookings: allBookings.filter(b => b.status === 'pending').length,
       completedBookings: allBookings.filter(b => b.status === 'completed').length,
+      pendingVerifications: allVerifs.filter(v => ['pending', 'under_review'].includes(v.status || '')).length,
     };
   }
 

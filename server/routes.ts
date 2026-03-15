@@ -87,7 +87,7 @@ async function seedDatabase() {
   const adminUsers = await db.select().from(schema.users).where(eq(schema.users.role, 'admin'));
   if (adminUsers.length === 0) {
     await db.insert(schema.users).values({ fullName: "Admin", role: "admin", email: "admin@fixosmart.com" }).returning();
-    const [tech] = await db.insert(schema.users).values({ fullName: "Mohammed Al-Harbi", role: "technician", phone: "+966501234567" }).returning();
+    const [tech] = await db.insert(schema.users).values({ fullName: "Mohammed Al-Harbi", role: "technician", phone: "+966501234567", verificationStatus: "approved" }).returning();
     await db.insert(schema.technicians).values({ userId: tech.id, specialization: "AC", bio: "10 years experience in AC repair and maintenance", rating: "4.9", totalJobs: 127, hourlyRate: "80" });
   }
 
@@ -152,7 +152,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ ok: true });
   });
 
-  // ===== PROFILE (own profile update) =====
+  // ===== PROFILE =====
   app.patch('/api/profile', requireAuth, async (req: any, res) => {
     try {
       const { fullName, email, phone, profilePhoto } = req.body;
@@ -168,7 +168,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // ===== SERVICES (public reads, admin writes) =====
+  // ===== SERVICES =====
   app.get('/api/services', async (req, res) => {
     res.json(await storage.getServices());
   });
@@ -188,7 +188,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.status(204).send();
   });
 
-  // ===== PRODUCTS (public reads, admin writes) =====
+  // ===== PRODUCTS =====
   app.get('/api/products', async (req, res) => {
     res.json(await storage.getProducts());
   });
@@ -230,7 +230,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(b);
   });
 
-  // ===== TECHNICIANS (public read, auth writes) =====
+  // ===== TECHNICIANS =====
   app.get('/api/technicians', async (req, res) => {
     res.json(await storage.getTechnicians());
   });
@@ -271,6 +271,119 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(b);
   });
 
+  // ===== VERIFICATION =====
+
+  // Technician: get their verification status
+  app.get('/api/verify/status', requireRole('technician', 'admin'), async (req: any, res) => {
+    const user = req.currentUser;
+    // Check if they have a legacy technicians table record (seeded/pre-verified)
+    const legacyTech = await storage.getTechnicianByUserId(user.id);
+    if (legacyTech) {
+      return res.json({ status: 'approved', isLegacy: true, hasApplication: true, technicianId: legacyTech.id });
+    }
+    // Check verification application
+    const verif = await storage.getVerificationByUserId(user.id);
+    if (!verif) return res.json({ status: null, hasApplication: false });
+    return res.json({
+      status: verif.status,
+      hasApplication: true,
+      verificationId: verif.id,
+      adminNotes: verif.adminNotes,
+    });
+  });
+
+  // Technician: submit verification application
+  app.post('/api/verify/apply', requireRole('technician'), async (req: any, res) => {
+    try {
+      const user = req.currentUser;
+      // Check if already applied
+      const existing = await storage.getVerificationByUserId(user.id);
+      if (existing) {
+        return res.status(409).json({ message: "You have already submitted a verification application" });
+      }
+      const data = {
+        userId: user.id,
+        fullName: req.body.fullName || user.fullName,
+        phone: req.body.phone || user.phone,
+        email: req.body.email || user.email,
+        city: req.body.city || user.city,
+        specialization: req.body.specialization,
+        yearsExperience: Number(req.body.yearsExperience || 0),
+        skills: Array.isArray(req.body.skills) ? req.body.skills : (req.body.skills ? [req.body.skills] : []),
+        bio: req.body.bio,
+        govIdUrl: req.body.govIdUrl,
+        workCertUrl: req.body.workCertUrl,
+        portfolioUrls: Array.isArray(req.body.portfolioUrls) ? req.body.portfolioUrls : [],
+        profilePhotoUrl: req.body.profilePhotoUrl,
+        videoUrl: req.body.videoUrl,
+        status: 'pending',
+      };
+      if (!data.specialization) return res.status(400).json({ message: "Specialization is required" });
+      const verif = await storage.createVerification(data);
+      // Update user verificationStatus
+      await storage.updateUser(user.id, { verificationStatus: 'pending' });
+      res.status(201).json(verif);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to submit application" });
+    }
+  });
+
+  // Admin: list all verification applications
+  app.get('/api/admin/verifications', requireRole('admin'), async (req, res) => {
+    res.json(await storage.getAllVerifications());
+  });
+
+  // Admin: get single application
+  app.get('/api/admin/verifications/:id', requireRole('admin'), async (req, res) => {
+    const all = await storage.getAllVerifications();
+    const v = all.find((v: any) => v.id === Number(req.params.id));
+    if (!v) return res.status(404).json({ message: "Not found" });
+    res.json(v);
+  });
+
+  // Admin: update verification status + scores + notes
+  app.patch('/api/admin/verifications/:id', requireRole('admin'), async (req: any, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { status, adminNotes, scoreExperience, scorePortfolio, scoreDocument, scoreCommunication } = req.body;
+      const updated = await storage.updateVerification(id, {
+        ...(status ? { status } : {}),
+        ...(adminNotes !== undefined ? { adminNotes } : {}),
+        ...(scoreExperience !== undefined ? { scoreExperience: Number(scoreExperience) } : {}),
+        ...(scorePortfolio !== undefined ? { scorePortfolio: Number(scorePortfolio) } : {}),
+        ...(scoreDocument !== undefined ? { scoreDocument: Number(scoreDocument) } : {}),
+        ...(scoreCommunication !== undefined ? { scoreCommunication: Number(scoreCommunication) } : {}),
+      });
+
+      // Sync user verificationStatus
+      if (status) {
+        await storage.updateUser(updated.userId, { verificationStatus: status });
+      }
+
+      // If approved → auto-create technician profile record
+      if (status === 'approved') {
+        const existingTech = await storage.getTechnicianByUserId(updated.userId);
+        if (!existingTech) {
+          await storage.createTechnician({
+            userId: updated.userId,
+            specialization: updated.specialization,
+            bio: updated.bio || '',
+            hourlyRate: "80",
+            isAvailable: true,
+          });
+          // Update user profile photo if provided
+          if (updated.profilePhotoUrl) {
+            await storage.updateUser(updated.userId, { profilePhoto: updated.profilePhotoUrl });
+          }
+        }
+      }
+
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to update verification" });
+    }
+  });
+
   // ===== REVIEWS =====
   app.get('/api/reviews', async (req, res) => {
     res.json(await storage.getReviews());
@@ -282,7 +395,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!bookingId || !rating || rating < 1 || rating > 5) {
         return res.status(400).json({ message: "bookingId and rating (1-5) are required" });
       }
-      // Validate booking exists and belongs to this user
       const userBookings = await storage.getBookings(req.currentUser.id);
       const booking = userBookings.find(b => b.id === Number(bookingId));
       if (!booking) {
@@ -291,7 +403,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (booking.status !== 'completed') {
         return res.status(400).json({ message: "You can only review completed bookings" });
       }
-      // Check if already reviewed
       const alreadyReviewed = await storage.hasReviewedBooking(req.currentUser.id, Number(bookingId));
       if (alreadyReviewed) {
         return res.status(409).json({ message: "You have already reviewed this booking" });
@@ -304,7 +415,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         comment: comment || null,
         photoUrl: photoUrl || null,
       });
-      // Recalculate technician rating
       const techId = technicianId ? Number(technicianId) : booking.technicianId;
       if (techId) await storage.updateTechnicianRating(techId);
       res.status(201).json(r);
@@ -399,7 +509,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ===== SITE SETTINGS =====
   app.get('/api/settings', async (req, res) => {
     const all = await storage.getSiteSettings();
-    // Return as object map for easy frontend use
     const map: Record<string, string> = {};
     for (const s of all) map[s.key] = s.value;
     res.json(map);

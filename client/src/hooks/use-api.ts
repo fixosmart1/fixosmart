@@ -374,3 +374,28 @@ export function useDeleteUser() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['/api/admin/users'] }),
   });
 }
+
+// ─── VERIFICATION ──────────────────────────────────────────────────────────────
+
+export function useVerifyStatus() {
+  return useQuery<{
+    status: string | null;
+    hasApplication: boolean;
+    isLegacy?: boolean;
+    technicianId?: number;
+    verificationId?: number;
+    adminNotes?: string;
+  } | null>({
+    queryKey: ['/api/verify/status'],
+    queryFn: () => apiFetch('/api/verify/status').catch(() => null),
+    retry: false,
+    staleTime: 30000,
+  });
+}
+
+export function useAdminVerifications() {
+  return useQuery<any[]>({
+    queryKey: ['/api/admin/verifications'],
+    queryFn: () => apiFetch('/api/admin/verifications'),
+  });
+}

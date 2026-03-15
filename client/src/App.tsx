@@ -33,6 +33,9 @@ import { AdminSettings } from "./pages/admin/AdminSettings";
 import { TechnicianDashboard } from "./pages/technician/TechnicianDashboard";
 import { TechnicianJobs } from "./pages/technician/TechnicianJobs";
 import { TechnicianEarnings } from "./pages/technician/TechnicianEarnings";
+import { VerificationForm } from "./pages/technician/VerificationForm";
+import { VerificationStatus } from "./pages/technician/VerificationStatus";
+import { AdminVerifications } from "./pages/admin/AdminVerifications";
 
 // ─── Route Guards ────────────────────────────────────────────────────────────
 
@@ -120,6 +123,23 @@ function Router() {
         <Route path="/admin/settings">
           <RequireAuth allowedRoles={['admin']}>
             <AdminSettings />
+          </RequireAuth>
+        </Route>
+        <Route path="/admin/verifications">
+          <RequireAuth allowedRoles={['admin']}>
+            <AdminVerifications />
+          </RequireAuth>
+        </Route>
+
+        {/* Technician verification routes — must be BEFORE /technician/:id wildcard */}
+        <Route path="/technician/apply">
+          <RequireAuth allowedRoles={['technician']}>
+            <VerificationForm />
+          </RequireAuth>
+        </Route>
+        <Route path="/technician/verify-status">
+          <RequireAuth allowedRoles={['technician']}>
+            <VerificationStatus />
           </RequireAuth>
         </Route>
 

@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLanguage } from "@/hooks/use-language";
-import { useAuth, useMyJobs, useMyEarnings, useTechnicians, useServices, useUpdateJob, useLogout } from "@/hooks/use-api";
-import { Link } from "wouter";
+import { useAuth, useMyJobs, useMyEarnings, useTechnicians, useServices, useUpdateJob, useLogout, useVerifyStatus } from "@/hooks/use-api";
+import { Link, useLocation } from "wouter";
 import {
   Briefcase, TrendingUp, CheckCircle, Clock, Star, MapPin, Calendar,
   Phone, Mail, User, Zap, Droplet, Cpu, ShieldCheck, Wind, Wrench,
@@ -218,6 +218,8 @@ function EmptyState({ tab }: { tab: string }) {
 export function TechnicianDashboard() {
   const { t } = useLanguage();
   const { data: user } = useAuth();
+  const { data: verifyStatus, isLoading: verifyLoading } = useVerifyStatus();
+  const [, setLocation] = useLocation();
   const { data: jobs = [], isLoading } = useMyJobs();
   const { data: earnings } = useMyEarnings();
   const { data: allTechs = [] } = useTechnicians();
@@ -226,6 +228,18 @@ export function TechnicianDashboard() {
   const logout = useLogout();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<string>("pending");
+
+  // ── Access control: redirect unverified technicians ──────────────────────
+  useEffect(() => {
+    if (verifyLoading) return;
+    if (!verifyStatus) return; // not a technician or error
+    if (verifyStatus.isLegacy || verifyStatus.status === 'approved') return; // allowed
+    if (!verifyStatus.hasApplication) {
+      setLocation("/technician/apply");
+    } else {
+      setLocation("/technician/verify-status");
+    }
+  }, [verifyStatus, verifyLoading]);
 
   // Find this technician's profile
   const myTech = (allTechs as any[]).find((t: any) => t.userId === user?.id);
@@ -295,7 +309,12 @@ export function TechnicianDashboard() {
               <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-bold leading-tight">{user?.fullName || "Technician"}</h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg sm:text-xl font-bold leading-tight">{user?.fullName || "Technician"}</h1>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-400/25 text-green-100 text-[10px] font-bold border border-green-300/30">
+                  <ShieldCheck size={10} /> VERIFIED
+                </span>
+              </div>
               {myTech && (
                 <p className="text-white/80 text-sm font-medium">{myTech.specialization} Specialist</p>
               )}
