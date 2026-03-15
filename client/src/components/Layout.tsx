@@ -5,9 +5,10 @@ import { LanguageSwitcher } from "./LanguageSwitcher";
 import { ThemeToggle } from "./ThemeToggle";
 import { useAuth, useLogout } from "@/hooks/use-api";
 import { LoadingScreen } from "./LoadingScreen";
+import { SOSModal } from "./SOSModal";
 import {
   Home, LayoutDashboard, Wrench, ShoppingBag, UserCircle,
-  PhoneCall, Users, Calendar, Briefcase, TrendingUp, LogOut, Settings, ShieldCheck
+  Zap, Users, Calendar, Briefcase, TrendingUp, LogOut, Settings, ShieldCheck
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -17,6 +18,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const { data: user } = useAuth();
   const logout = useLogout();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [sosOpen, setSosOpen] = useState(false);
 
   const role = user?.role || 'customer';
 
@@ -147,18 +149,28 @@ export function Layout({ children }: { children: ReactNode }) {
 
         {/* ─── SOS Floating Button (customers only) ─── */}
         {role === 'customer' && (
-          <Link href="/booking?type=emergency">
-            <div
-              className="fixed z-50 flex items-center justify-center w-14 h-14 bg-destructive text-white rounded-full shadow-2xl sos-pulse cursor-pointer active:scale-95 transition-transform select-none"
-              style={{
-                bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px) + 0.5rem)',
-                right: '1rem',
-              }}
-            >
-              <PhoneCall size={22} />
+          <motion.button
+            onClick={() => setSosOpen(true)}
+            whileTap={{ scale: 0.92 }}
+            className="fixed z-50 cursor-pointer select-none focus:outline-none w-14 h-14"
+            style={{
+              bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px) + 0.5rem)',
+              right: '1rem',
+            }}
+            aria-label="Emergency SOS"
+          >
+            {/* Pulse rings */}
+            <span className="absolute inset-0 rounded-full bg-destructive/40 animate-ping" style={{ animationDuration: '1.8s' }} />
+            <span className="absolute inset-0 rounded-full bg-destructive/20 animate-ping" style={{ animationDuration: '1.8s', animationDelay: '0.6s' }} />
+            {/* Button face */}
+            <div className="absolute inset-0 bg-destructive rounded-full flex flex-col items-center justify-center shadow-xl shadow-destructive/50 text-white border-2 border-white/30">
+              <Zap size={16} className="mb-0.5" />
+              <span className="text-[9px] font-black tracking-widest leading-none">SOS</span>
             </div>
-          </Link>
+          </motion.button>
         )}
+
+        <SOSModal isOpen={sosOpen} onClose={() => setSosOpen(false)} />
 
         {/* ─── Bottom Mobile Nav ─── */}
         <nav

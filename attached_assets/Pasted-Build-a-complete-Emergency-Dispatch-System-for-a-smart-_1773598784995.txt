@@ -1,0 +1,227 @@
+Build a complete Emergency Dispatch System for a smart home service platform called "FixoSmart".
+
+FixoSmart is a home maintenance service marketplace operating in Jeddah, Saudi Arabia. The emergency system should allow users to instantly request help for urgent home issues and automatically dispatch the nearest available technician.
+
+Design the system similar to modern ride-hailing apps like Uber for a fast and intuitive experience.
+
+---
+
+1. FLOATING SOS BUTTON
+
+---
+
+Create a floating red SOS emergency button that is visible on all pages.
+
+Position:
+bottom-right corner
+
+Design:
+
+* red circular button
+* pulse animation
+* lightning icon ⚡
+* label "SOS"
+
+Clicking the button should open a full screen emergency interface.
+
+---
+
+2. EMERGENCY SERVICE SELECTION
+
+---
+
+Display a full screen modal titled:
+
+"Emergency Home Help"
+
+Show large selectable cards with icons:
+
+⚡ Electrical Short / Power Failure
+💧 Water Leak / Pipe Burst
+❄️ AC Not Working (Extreme Heat)
+🔐 Locked Out of Home
+📷 CCTV / Security Camera Failure
+
+Each card should contain:
+
+* icon
+* service title
+* short description
+
+Selecting a card moves to the next step.
+
+---
+
+3. AUTO LOCATION DETECTION
+
+---
+
+Detect the user location automatically.
+
+Show:
+
+"Your location: Jeddah"
+
+Allow district selection:
+
+Al-Safa
+Al-Hamra
+Al-Rawdah
+Obhur
+Al-Nazlah
+Al-Basateen
+Al-Marwah
+
+Also allow manual address input.
+
+---
+
+4. EMERGENCY REQUEST CONFIRMATION
+
+---
+
+Show a confirmation screen:
+
+Problem: [selected issue]
+Location: [district]
+Priority: Emergency
+
+Show estimated arrival:
+
+"Technician arrival in 15–25 minutes"
+
+Estimated price range:
+
+"120 – 250 SAR"
+
+Large confirmation button:
+
+"Request Emergency Technician"
+
+---
+
+5. AUTOMATIC TECHNICIAN DISPATCH
+
+---
+
+When confirmed:
+
+Create emergency booking with:
+
+priority = emergency
+status = searching
+
+Search for nearest technician based on location.
+
+Display a matching screen:
+
+"Finding nearest technician..."
+
+Show technician card:
+
+Name
+Photo
+Rating
+Distance
+Specialization
+
+Example:
+
+Technician: Ahmed
+Rating: 4.8
+Distance: 2.3 km
+Specialty: Electrical
+
+---
+
+6. LIVE TECHNICIAN TRACKING
+
+---
+
+Once technician accepts:
+
+Show a tracking screen with:
+
+Live map view
+Technician moving toward customer
+
+Technician card:
+
+Name
+Rating
+Call button
+WhatsApp chat button
+
+ETA countdown timer.
+
+---
+
+7. CUSTOMER SUPPORT OPTIONS
+
+---
+
+Provide quick support tools:
+
+Call technician
+Chat on WhatsApp
+Send photo of problem
+Start video call
+
+---
+
+8. MULTILINGUAL SUPPORT
+
+---
+
+All UI text must support:
+
+English
+Arabic
+Bangla
+
+When Arabic is selected the UI must switch to RTL layout.
+
+---
+
+9. MOBILE-FIRST DESIGN
+
+---
+
+Optimize UI for mobile devices.
+
+Use modern card layout and smooth animations.
+
+Emergency screens should feel fast, simple and clear.
+
+---
+
+10. TECHNOLOGY
+
+---
+
+Frontend:
+React + Tailwind CSS
+
+Backend:
+Supabase database
+
+Tables required:
+
+bookings
+technicians
+profiles
+
+Emergency booking must store:
+
+service_type
+district
+priority
+status
+technician_id
+created_at
+
+---
+
+GOAL
+
+Create an Uber-style emergency dispatch experience where users can request urgent home repair help within seconds.

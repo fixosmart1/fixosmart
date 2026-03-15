@@ -26,7 +26,7 @@ FixoSmart is a trilingual (EN/BN/AR) smart home maintenance and repair marketpla
 - **Admin Verification Center**: Filterable list (All/Pending/Approved/Rejected), expandable application cards with full details, portfolio image preview, admin quality scoring (Experience/Portfolio/Documents/Communication, 1–5 each), approve/reject/request-more actions, admin notes, auto-creates technician profile on approval
 - **Booking System**: 3-step flow, notes field, promo code with live discount, WhatsApp share, emergency SOS mode
 - **Expat Tools**: Iqama tracker (30-day warning), SAR→BDT converter (29.5 rate), prayer times, WhatsApp share
-- **SOS Button**: Floating red button (customers only), routes to emergency booking
+- **SOS Emergency Dispatch**: Full Uber-style 6-step animated modal — type selection (5 emergency cards), location/district picker, confirmation (ETA + price), radar search animation, technician matched card (Call/WhatsApp), live tracking map with animated technician marker + ETA countdown. Creates real booking on confirm. Only for customers.
 - **Profile Editing**: Edit name, email, phone, profile photo URL with instant save
 - **User Suspension**: Admin can suspend/unsuspend accounts; suspended users cannot log in
 - **Double-Reward Referral System**: Auto-generated unique codes (FX + 5 digits) for every user. New users get 10% off first booking when signing up with a referral code. Inviters earn 5 SAR wallet credit per successful referral. Full referral panel in Profile (stats: Friends Joined, SAR Earned, Wallet Balance; copy code, copy link, WhatsApp share). URL ?ref= auto-populates referral code on signup. Wallet balance usable as credit at checkout in booking flow. Dashboard shows active discount/wallet banners.
