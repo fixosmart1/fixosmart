@@ -29,7 +29,7 @@ FixoSmart is a trilingual (EN/BN/AR) smart home maintenance and repair marketpla
 - **SOS Button**: Floating red button (customers only), routes to emergency booking
 - **Profile Editing**: Edit name, email, phone, profile photo URL with instant save
 - **User Suspension**: Admin can suspend/unsuspend accounts; suspended users cannot log in
-- **Referral System**: FIXO{userId} codes shown in profile
+- **Double-Reward Referral System**: Auto-generated unique codes (FX + 5 digits) for every user. New users get 10% off first booking when signing up with a referral code. Inviters earn 5 SAR wallet credit per successful referral. Full referral panel in Profile (stats: Friends Joined, SAR Earned, Wallet Balance; copy code, copy link, WhatsApp share). URL ?ref= auto-populates referral code on signup. Wallet balance usable as credit at checkout in booking flow. Dashboard shows active discount/wallet banners.
 
 ## Routes
 ### Customer

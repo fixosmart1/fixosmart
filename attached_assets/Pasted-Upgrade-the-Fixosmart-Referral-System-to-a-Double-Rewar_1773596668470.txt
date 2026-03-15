@@ -1,0 +1,147 @@
+Upgrade the Fixosmart Referral System to a Double-Reward Referral Program.
+
+Both the inviter and the new user should receive benefits when a referral is successfully used.
+
+Do not modify unrelated systems such as technician dashboard, admin core logic, or existing booking functionality unless required.
+
+---
+
+## STEP 1 — DATABASE UPDATES
+
+Update Users table with fields:
+
+referral_code
+referred_by
+wallet_balance
+
+referral_code
+Unique code generated for each user.
+
+Example:
+FX58293
+
+referred_by
+Stores referral code used during signup.
+
+wallet_balance
+Stores reward credits for the user.
+
+---
+
+## STEP 2 — REFERRAL CODE GENERATION
+
+When a new user registers:
+
+Automatically generate a unique referral code.
+
+Format example:
+
+FX + random numbers
+
+Example:
+FX47291
+
+Save it in referral_code field.
+
+---
+
+## STEP 3 — SIGNUP WITH REFERRAL CODE
+
+Add an optional field in registration form:
+
+Referral Code
+
+When a valid code is entered:
+
+• store it in referred_by
+• mark user as referred
+
+---
+
+## STEP 4 — REFERRAL REWARD LOGIC
+
+Rewards should be granted when the referred user completes their first booking.
+
+Reward rules:
+
+New User Reward
+10% discount on first booking
+
+Inviter Reward
+$5 or platform credit added to wallet_balance
+
+---
+
+## STEP 5 — CUSTOMER PROFILE REFERRAL PANEL
+
+Add a section in customer profile:
+
+Invite Friends
+
+Display:
+
+Your Referral Code
+Share Referral Link
+
+Example link:
+
+fixosmart.com/register?ref=FX47291
+
+Buttons:
+
+Copy Code
+Copy Link
+Share via WhatsApp
+
+---
+
+## STEP 6 — REFERRAL TRACKING
+
+Show statistics in profile:
+
+Friends Joined
+Rewards Earned
+Wallet Balance
+
+Example display:
+
+Friends Joined: 4
+Rewards Earned: $20
+Wallet Balance: $20
+
+---
+
+## STEP 7 — WALLET USAGE
+
+Allow users to use wallet balance when booking services.
+
+Example:
+
+Service Price: $100
+Wallet Credit: $10
+
+Final Payment: $90
+
+---
+
+## STEP 8 — SECURITY RULES
+
+Prevent abuse:
+
+• referral code valid only for new users
+• reward triggered only after first completed booking
+• limit self-referrals
+• referral reward granted once per user
+
+---
+
+## FINAL OUTPUT
+
+Provide:
+
+1. database schema changes
+2. referral code generation logic
+3. registration form update
+4. referral dashboard in customer profile
+5. wallet reward logic
+6. explanation of referral workflow

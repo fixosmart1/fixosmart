@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth, useLogin, useLogout, useUpdateProfile } from "@/hooks/use-api";
 import { useLocation } from "wouter";
-import { User, Mail, Phone, Globe, Shield, Copy, CheckCircle, Edit2, Save, X, Camera, Gift, Tag, AlertCircle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { User, Mail, Phone, Globe, Shield, Copy, CheckCircle, Edit2, Save, X, Camera, Gift, Tag, AlertCircle, Users, Wallet, Award, ExternalLink, MessageCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
@@ -15,12 +16,31 @@ export function Profile() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const [loginForm, setLoginForm] = useState({ fullName: "", email: "", role: "customer", referralCode: "" });
+  const [loginForm, setLoginForm] = useState(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const refFromUrl = urlParams.get('ref') || '';
+    return { fullName: "", email: "", role: "customer", referralCode: refFromUrl };
+  });
   const [referralValidation, setReferralValidation] = useState<{ valid: boolean; name?: string } | null>(null);
   const [checkingReferral, setCheckingReferral] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ fullName: "", email: "", phone: "", profilePhoto: "" });
+
+  const { data: referralStats } = useQuery<{
+    referralCode: string; friendsJoined: number; rewardsEarned: number; walletBalance: number;
+  }>({
+    queryKey: ['/api/referral/stats'],
+    enabled: !!user,
+  });
+
+  // Auto-validate referral code from URL param
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const ref = urlParams.get('ref');
+    if (ref && ref.length >= 7) checkReferralCode(ref);
+  }, []);
 
   const startEdit = () => {
     setEditForm({
@@ -92,11 +112,26 @@ export function Profile() {
     window.location.href = '/profile';
   };
 
+  const getReferralCode = () => user?.referralCode || `FIXO${user?.id || ''}`;
+  const getReferralLink = () => `${window.location.origin}/profile?ref=${getReferralCode()}`;
+
   const copyReferral = () => {
-    const code = user?.referralCode || `FIXO${user?.id || ''}`;
-    navigator.clipboard.writeText(code);
+    navigator.clipboard.writeText(getReferralCode());
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyReferralLink = () => {
+    navigator.clipboard.writeText(getReferralLink());
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const shareWhatsApp = () => {
+    const msg = encodeURIComponent(
+      `🏠 I use FixoSmart for smart home repairs in Jeddah! Use my referral code *${getReferralCode()}* when you sign up and get 10% off your first booking!\n👉 ${getReferralLink()}`
+    );
+    window.open(`https://wa.me/?text=${msg}`, '_blank');
   };
 
   const roleBadgeColor: any = {
@@ -328,39 +363,91 @@ export function Profile() {
           </div>
         </div>
 
-        {/* Discount available banner */}
-        {user.discountAvailable && (
-          <div className="glass rounded-2xl p-4 border border-green-500/30 bg-green-50/50 dark:bg-green-900/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-500/10 rounded-full flex items-center justify-center shrink-0">
-                <Tag size={18} className="text-green-600" />
-              </div>
-              <div>
-                <p className="font-semibold text-green-700 dark:text-green-400">10% Referral Discount Available!</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Your discount will be auto-applied on your next booking.</p>
-              </div>
+        {/* Referral & Wallet Panel */}
+        <div className="glass rounded-2xl p-5 space-y-5">
+          <h3 className="font-bold text-lg flex items-center gap-2"><Gift size={18} className="text-primary" /> Invite Friends & Earn</h3>
+
+          {/* Stats Row */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-primary/5 rounded-xl p-3 text-center">
+              <Users size={20} className="mx-auto mb-1 text-primary" />
+              <p className="text-2xl font-bold">{referralStats?.friendsJoined ?? 0}</p>
+              <p className="text-xs text-muted-foreground">Friends Joined</p>
+            </div>
+            <div className="bg-amber-500/10 rounded-xl p-3 text-center">
+              <Award size={20} className="mx-auto mb-1 text-amber-600" />
+              <p className="text-2xl font-bold">{referralStats?.rewardsEarned ?? 0}</p>
+              <p className="text-xs text-muted-foreground">SAR Earned</p>
+            </div>
+            <div className="bg-green-500/10 rounded-xl p-3 text-center">
+              <Wallet size={20} className="mx-auto mb-1 text-green-600" />
+              <p className="text-2xl font-bold">{parseFloat(user.walletBalance || '0').toFixed(0)}</p>
+              <p className="text-xs text-muted-foreground">Wallet (SAR)</p>
             </div>
           </div>
-        )}
 
-        {/* Referral Code */}
-        <div className="glass rounded-2xl p-5">
-          <h3 className="font-semibold mb-1 flex items-center gap-2"><Gift size={16} className="text-primary" />{t('invite_friend')}</h3>
-          <p className="text-xs text-muted-foreground mb-3">Share your code — friends get 10% off their first booking!</p>
-          <div className="flex items-center gap-3">
-            <div className="flex-1 px-4 py-2.5 bg-muted rounded-xl font-mono font-bold tracking-widest text-primary" data-testid="text-referral-code">
-              {user.referralCode || `FIXO${user.id}`}
+          {/* Discount available */}
+          {user.discountAvailable && (
+            <div className="flex items-center gap-3 p-3 rounded-xl border border-green-500/30 bg-green-50/50 dark:bg-green-900/10">
+              <Tag size={18} className="text-green-600 shrink-0" />
+              <div>
+                <p className="font-semibold text-green-700 dark:text-green-400 text-sm">10% Referral Discount Available!</p>
+                <p className="text-xs text-muted-foreground">Auto-applied on your next booking.</p>
+              </div>
             </div>
+          )}
+
+          {/* Referral Code */}
+          <div>
+            <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">Your Referral Code</p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 px-4 py-2.5 bg-muted rounded-xl font-mono font-bold tracking-widest text-primary text-lg" data-testid="text-referral-code">
+                {getReferralCode()}
+              </div>
+              <button
+                data-testid="button-copy-referral"
+                onClick={copyReferral}
+                className="px-3 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium text-sm flex items-center gap-1.5 whitespace-nowrap"
+              >
+                {copied ? <><CheckCircle size={14} />Copied!</> : <><Copy size={14} />Copy</>}
+              </button>
+            </div>
+          </div>
+
+          {/* Referral Link */}
+          <div>
+            <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">Share Referral Link</p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 px-3 py-2 bg-muted rounded-xl text-xs text-muted-foreground font-mono truncate">
+                /profile?ref={getReferralCode()}
+              </div>
+              <button
+                data-testid="button-copy-link"
+                onClick={copyReferralLink}
+                className="px-3 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-xl font-medium text-sm flex items-center gap-1.5 whitespace-nowrap border"
+              >
+                {copiedLink ? <><CheckCircle size={14} className="text-green-500" />Copied!</> : <><ExternalLink size={14} />Copy Link</>}
+              </button>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2">
             <button
-              data-testid="button-copy-referral"
-              onClick={copyReferral}
-              className="px-4 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium text-sm flex items-center gap-2"
+              data-testid="button-share-whatsapp"
+              onClick={shareWhatsApp}
+              className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl text-sm flex items-center justify-center gap-2 transition-colors"
             >
-              {copied ? <><CheckCircle size={14} />Copied!</> : <><Copy size={14} />Copy</>}
+              <MessageCircle size={16} /> Share via WhatsApp
             </button>
           </div>
+
+          <p className="text-xs text-muted-foreground text-center">
+            You earn <strong>5 SAR</strong> wallet credit for each friend who books. They get <strong>10% off</strong> their first booking!
+          </p>
+
           {user.referredBy && (
-            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1"><CheckCircle size={11} className="text-green-500" />Referred by code: <span className="font-mono font-semibold">{user.referredBy}</span></p>
+            <p className="text-xs text-muted-foreground flex items-center gap-1 justify-center border-t pt-3"><CheckCircle size={11} className="text-green-500" />You signed up with referral code <span className="font-mono font-semibold">{user.referredBy}</span></p>
           )}
         </div>
 

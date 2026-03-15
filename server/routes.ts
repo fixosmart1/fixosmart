@@ -141,7 +141,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // New user — generate referral code and apply incoming referral if valid
       if (!user.referralCode) {
-        const newCode = 'FIX' + Math.floor(10000 + Math.random() * 90000).toString();
+        const newCode = 'FX' + Math.floor(10000 + Math.random() * 90000).toString();
         const updates: any = { referralCode: newCode };
         if (appliedCode) {
           const referrer = await storage.getUserByReferralCode(appliedCode.trim().toUpperCase());
@@ -169,11 +169,43 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ valid: true, referrerName: referrer.fullName });
   });
 
-  // Consume the discount after a booking is placed
+  // Consume the discount after a booking is placed — and reward the inviter
   app.post('/api/referral/consume', requireAuth, async (req: any, res) => {
-    if (!req.currentUser.discountAvailable) return res.json({ ok: true });
-    await storage.updateUser(req.currentUser.id, { discountAvailable: false });
+    const user = req.currentUser;
+    if (!user.discountAvailable) return res.json({ ok: true });
+    // Clear discount for the referred user
+    await storage.updateUser(user.id, { discountAvailable: false });
+    // Reward the inviter with 5 SAR wallet credit
+    if (user.referredBy) {
+      const inviter = await storage.getUserByReferralCode(user.referredBy);
+      if (inviter) await storage.addWalletBalance(inviter.id, 5);
+    }
     res.json({ ok: true });
+  });
+
+  // Referral stats for current user
+  app.get('/api/referral/stats', requireAuth, async (req: any, res) => {
+    const user = req.currentUser;
+    const code = user.referralCode || '';
+    const friendsJoined = code ? await storage.getReferralCount(code) : 0;
+    const rewardsEarned = friendsJoined * 5;
+    res.json({
+      referralCode: code,
+      friendsJoined,
+      rewardsEarned,
+      walletBalance: parseFloat(user.walletBalance || '0'),
+    });
+  });
+
+  // Deduct wallet balance (used during booking)
+  app.post('/api/wallet/deduct', requireAuth, async (req: any, res) => {
+    const { amount } = req.body;
+    if (!amount || amount <= 0) return res.status(400).json({ message: 'Invalid amount' });
+    const user = req.currentUser;
+    const balance = parseFloat(user.walletBalance || '0');
+    const deduct = Math.min(amount, balance);
+    if (deduct > 0) await storage.addWalletBalance(user.id, -deduct);
+    res.json({ deducted: deduct });
   });
 
   app.post('/api/logout', (req: any, res) => {

@@ -21,8 +21,10 @@ export interface IStorage {
   // USERS
   getUser(id: number): Promise<User | undefined>;
   getOrCreateUserByFullName(fullName: string, role?: string, email?: string): Promise<User>;
-  updateUser(id: number, data: Partial<Pick<InsertUser, 'fullName' | 'email' | 'phone' | 'profilePhoto' | 'language' | 'verificationStatus' | 'referralCode' | 'referredBy' | 'discountAvailable'>>): Promise<User>;
+  updateUser(id: number, data: Partial<Pick<InsertUser, 'fullName' | 'email' | 'phone' | 'profilePhoto' | 'language' | 'verificationStatus' | 'referralCode' | 'referredBy' | 'discountAvailable' | 'walletBalance'>>): Promise<User>;
   getUserByReferralCode(code: string): Promise<User | undefined>;
+  getReferralCount(referralCode: string): Promise<number>;
+  addWalletBalance(userId: number, amount: number): Promise<void>;
   getAllUsers(): Promise<User[]>;
   updateUserRole(id: number, role: string): Promise<User>;
   suspendUser(id: number, suspended: boolean): Promise<User>;
@@ -114,6 +116,18 @@ export class DatabaseStorage implements IStorage {
   async getUserByReferralCode(code: string) {
     const [u] = await db.select().from(users).where(eq(users.referralCode, code));
     return u;
+  }
+
+  async getReferralCount(referralCode: string) {
+    const result = await db.select().from(users).where(eq(users.referredBy, referralCode));
+    return result.length;
+  }
+
+  async addWalletBalance(userId: number, amount: number) {
+    const user = await this.getUser(userId);
+    if (!user) return;
+    const current = parseFloat(user.walletBalance || "0");
+    await db.update(users).set({ walletBalance: (current + amount).toFixed(2) }).where(eq(users.id, userId));
   }
 
   async getAllUsers() {

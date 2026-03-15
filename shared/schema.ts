@@ -18,6 +18,7 @@ export const users = pgTable("users", {
   suspended: boolean("suspended").default(false),
   verificationStatus: text("verification_status"), // null | pending | under_review | approved | rejected
   discountAvailable: boolean("discount_available").default(false),
+  walletBalance: numeric("wallet_balance").default("0"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -135,7 +135,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Referral Discount Banner */}
+      {/* Discount or Wallet Banner */}
       {user?.discountAvailable && (
         <Link href="/booking">
           <div className="glass border border-green-500/30 bg-green-50/50 dark:bg-green-900/10 rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:border-green-500/60 transition-colors" data-testid="banner-dashboard-discount">
@@ -147,6 +147,20 @@ export function Dashboard() {
               <p className="text-xs text-muted-foreground mt-0.5">Auto-applied on your next booking. Tap to book now!</p>
             </div>
             <ArrowRight size={16} className="text-green-600 shrink-0" />
+          </div>
+        </Link>
+      )}
+      {!user?.discountAvailable && parseFloat(user?.walletBalance || '0') > 0 && (
+        <Link href="/booking">
+          <div className="glass border border-amber-500/30 bg-amber-50/50 dark:bg-amber-900/10 rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:border-amber-500/60 transition-colors" data-testid="banner-dashboard-wallet">
+            <div className="w-10 h-10 bg-amber-500/15 rounded-full flex items-center justify-center shrink-0">
+              <span className="text-xl">💰</span>
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-amber-700 dark:text-amber-400">{parseFloat(user!.walletBalance!).toFixed(2)} SAR Wallet Credit!</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Apply your wallet balance when booking a service.</p>
+            </div>
+            <ArrowRight size={16} className="text-amber-600 shrink-0" />
           </div>
         </Link>
       )}

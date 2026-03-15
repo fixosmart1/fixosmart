@@ -34,6 +34,7 @@ export function Booking() {
     discountPercent: 0,
     promoValidated: false,
   });
+  const [useWallet, setUseWallet] = useState(false);
 
   const districts = ["Al-Safa", "Al-Hamra", "Al-Rawdah", "Obhur", "Al-Nazlah", "Al-Basateen", "Al-Marwah", "Al-Sharafiyah", "Al-Balad"];
 
@@ -54,13 +55,16 @@ export function Booking() {
   };
 
   const referralDiscount = !!user?.discountAvailable && !formData.promoValidated;
+  const walletBalance = parseFloat(user?.walletBalance || '0');
 
   const calcTotal = () => {
     const sub = calcSubtotal();
     const promoDiscount = formData.promoValidated ? Math.round(sub * formData.discountPercent / 100) : 0;
     const refDiscount = referralDiscount ? Math.round(sub * 10 / 100) : 0;
+    const afterDiscount = sub - promoDiscount - refDiscount;
+    const walletUsed = useWallet ? Math.min(walletBalance, afterDiscount) : 0;
     const discount = promoDiscount + refDiscount;
-    return { sub, discount, promoDiscount, refDiscount, total: sub - discount };
+    return { sub, discount, promoDiscount, refDiscount, walletUsed, total: Math.max(0, afterDiscount - walletUsed) };
   };
 
   const handleApplyPromo = async () => {
@@ -83,7 +87,7 @@ export function Booking() {
   const handleBack = () => setStep(s => Math.max(s - 1, 1));
 
   const handleSubmit = async () => {
-    const { sub, discount, total, refDiscount } = calcTotal();
+    const { sub, discount, total, refDiscount, walletUsed } = calcTotal();
     try {
       await createBooking.mutateAsync({
         userId: user!.id,
@@ -97,10 +101,13 @@ export function Booking() {
         languagePreference: language,
         totalAmountSar: total.toString(),
         promoCode: formData.promoValidated ? formData.promoCode.toUpperCase() : null,
-        discountSar: discount.toString(),
+        discountSar: (discount + walletUsed).toString(),
       });
       if (refDiscount > 0) {
         await fetch('/api/referral/consume', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      }
+      if (walletUsed > 0) {
+        await fetch('/api/wallet/deduct', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: walletUsed }) });
       }
       toast({ title: "Booking confirmed! 🎉", description: `Total: ${total} SAR. We'll contact you soon.` });
       const msg = encodeURIComponent(`New Booking\nName: ${user!.fullName}\nDate: ${formData.bookingDate}\nDist: ${formData.district}\nTotal: ${total} SAR`);
@@ -125,7 +132,7 @@ export function Booking() {
     );
   }
 
-  const { sub, discount, total, refDiscount, promoDiscount } = calcTotal();
+  const { sub, discount, total, refDiscount, promoDiscount, walletUsed } = calcTotal();
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -334,6 +341,24 @@ export function Booking() {
                 <p className="text-xs text-muted-foreground">Try: WELCOME10 · EXPAT20 · JEDDAH15</p>
               </div>
 
+              {/* Wallet Balance */}
+              {walletBalance > 0 && (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium flex items-center gap-2">
+                    <span>💰</span> Wallet Balance ({walletBalance.toFixed(2)} SAR available)
+                  </label>
+                  <button
+                    data-testid="button-toggle-wallet"
+                    type="button"
+                    onClick={() => setUseWallet(w => !w)}
+                    className={`w-full p-3.5 rounded-xl border-2 font-medium text-sm flex items-center justify-between transition-all ${useWallet ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'border-border hover:border-primary/50'}`}
+                  >
+                    <span>{useWallet ? '✓ Using wallet credit' : 'Apply wallet balance'}</span>
+                    <span className="font-mono">{useWallet ? `-${calcTotal().walletUsed.toFixed(2)} SAR` : `${walletBalance.toFixed(2)} SAR`}</span>
+                  </button>
+                </div>
+              )}
+
               {/* Order Summary */}
               <div className="p-5 bg-muted/50 rounded-xl space-y-2">
                 <h3 className="font-bold border-b border-border pb-2 mb-3">Order Summary</h3>
@@ -360,6 +385,12 @@ export function Booking() {
                   <div className="flex justify-between text-sm text-green-600">
                     <span>Promo ({formData.discountPercent}% off)</span>
                     <span>-{promoDiscount} SAR</span>
+                  </div>
+                )}
+                {walletUsed > 0 && (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>💰 Wallet credit</span>
+                    <span>-{walletUsed.toFixed(2)} SAR</span>
                   </div>
                 )}
                 <div className="pt-2 border-t border-border flex justify-between font-bold text-base">
