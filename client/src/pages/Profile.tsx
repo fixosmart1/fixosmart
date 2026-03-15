@@ -57,6 +57,9 @@ export function Profile() {
     try {
       const u = await login.mutateAsync({ fullName: loginForm.fullName, email: loginForm.email || undefined, role: loginForm.role });
       toast({ title: "Logged in!", description: `Welcome, ${u.fullName}` });
+      if (u.role === 'admin') setLocation('/admin');
+      else if (u.role === 'technician') setLocation('/technician/dashboard');
+      else setLocation('/dashboard');
     } catch (err: any) {
       toast({ title: "Login failed", description: err.message, variant: "destructive" });
     }
