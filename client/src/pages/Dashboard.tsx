@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth, useBookings, useIqamaTrackers, useServices, useCreateReview } from "@/hooks/use-api";
-import { Calendar, CloudSun, Compass, FileText, ArrowRight, Activity, Wrench, Star, X, CheckCircle, MapPin } from "lucide-react";
+import { Calendar, CloudSun, Compass, FileText, ArrowRight, Activity, Wrench, Star, X, CheckCircle, MapPin, Tag } from "lucide-react";
 import { Link } from "wouter";
 import { format, differenceInDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -134,6 +134,22 @@ export function Dashboard() {
           <Activity size={16} /> {t('welcome')}, {user?.fullName}
         </div>
       </div>
+
+      {/* Referral Discount Banner */}
+      {user?.discountAvailable && (
+        <Link href="/booking">
+          <div className="glass border border-green-500/30 bg-green-50/50 dark:bg-green-900/10 rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:border-green-500/60 transition-colors" data-testid="banner-dashboard-discount">
+            <div className="w-10 h-10 bg-green-500/15 rounded-full flex items-center justify-center shrink-0">
+              <Tag size={18} className="text-green-600" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-green-700 dark:text-green-400">🎁 10% Referral Discount Available!</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Auto-applied on your next booking. Tap to book now!</p>
+            </div>
+            <ArrowRight size={16} className="text-green-600 shrink-0" />
+          </div>
+        </Link>
+      )}
 
       {/* Stat Widgets */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

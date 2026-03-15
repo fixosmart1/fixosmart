@@ -133,16 +133,47 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.post('/api/login', async (req, res) => {
     try {
-      const { fullName, email, role } = req.body;
+      const { fullName, email, role, referralCode: appliedCode } = req.body;
       if (!fullName) return res.status(400).json({ message: "Full name is required" });
       const safeRole = role === 'technician' ? 'technician' : 'customer';
       const user = await storage.getOrCreateUserByFullName(fullName, safeRole, email);
       if (user.suspended) return res.status(403).json({ message: "Account suspended. Contact support." });
+
+      // New user — generate referral code and apply incoming referral if valid
+      if (!user.referralCode) {
+        const newCode = 'FIX' + Math.floor(10000 + Math.random() * 90000).toString();
+        const updates: any = { referralCode: newCode };
+        if (appliedCode) {
+          const referrer = await storage.getUserByReferralCode(appliedCode.trim().toUpperCase());
+          if (referrer && referrer.id !== user.id) {
+            updates.referredBy = appliedCode.trim().toUpperCase();
+            updates.discountAvailable = true;
+          }
+        }
+        const updated = await storage.updateUser(user.id, updates);
+        setSession(res, user.id);
+        return res.json(updated);
+      }
+
       setSession(res, user.id);
       res.json(user);
     } catch (err) {
       res.status(500).json({ message: "Login failed" });
     }
+  });
+
+  // Validate a referral code
+  app.get('/api/referral/validate/:code', async (req, res) => {
+    const referrer = await storage.getUserByReferralCode(req.params.code.toUpperCase());
+    if (!referrer) return res.status(404).json({ valid: false, message: "Invalid referral code" });
+    res.json({ valid: true, referrerName: referrer.fullName });
+  });
+
+  // Consume the discount after a booking is placed
+  app.post('/api/referral/consume', requireAuth, async (req: any, res) => {
+    if (!req.currentUser.discountAvailable) return res.json({ ok: true });
+    await storage.updateUser(req.currentUser.id, { discountAvailable: false });
+    res.json({ ok: true });
   });
 
   app.post('/api/logout', (req: any, res) => {

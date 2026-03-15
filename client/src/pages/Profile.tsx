@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth, useLogin, useLogout, useUpdateProfile } from "@/hooks/use-api";
 import { useLocation } from "wouter";
-import { User, Mail, Phone, Globe, Shield, Copy, CheckCircle, Edit2, Save, X, Camera } from "lucide-react";
+import { User, Mail, Phone, Globe, Shield, Copy, CheckCircle, Edit2, Save, X, Camera, Gift, Tag, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
@@ -15,7 +15,9 @@ export function Profile() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const [loginForm, setLoginForm] = useState({ fullName: "", email: "", role: "customer" });
+  const [loginForm, setLoginForm] = useState({ fullName: "", email: "", role: "customer", referralCode: "" });
+  const [referralValidation, setReferralValidation] = useState<{ valid: boolean; name?: string } | null>(null);
+  const [checkingReferral, setCheckingReferral] = useState(false);
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ fullName: "", email: "", phone: "", profilePhoto: "" });
@@ -51,11 +53,31 @@ export function Profile() {
     }
   };
 
+  const checkReferralCode = async (code: string) => {
+    setReferralValidation(null);
+    if (!code.trim()) return;
+    setCheckingReferral(true);
+    try {
+      const res = await fetch(`/api/referral/validate/${code.trim().toUpperCase()}`);
+      const data = await res.json();
+      setReferralValidation({ valid: res.ok, name: data.referrerName });
+    } catch {
+      setReferralValidation({ valid: false });
+    } finally {
+      setCheckingReferral(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginForm.fullName.trim()) return;
     try {
-      const u = await login.mutateAsync({ fullName: loginForm.fullName, email: loginForm.email || undefined, role: loginForm.role });
+      const u = await login.mutateAsync({
+        fullName: loginForm.fullName,
+        email: loginForm.email || undefined,
+        role: loginForm.role,
+        referralCode: loginForm.referralCode.trim().toUpperCase() || undefined,
+      });
       toast({ title: "Logged in!", description: `Welcome, ${u.fullName}` });
       if (u.role === 'admin') setLocation('/admin');
       else if (u.role === 'technician') setLocation('/technician/dashboard');
@@ -71,7 +93,8 @@ export function Profile() {
   };
 
   const copyReferral = () => {
-    navigator.clipboard.writeText(`FIXO${user?.id || ''}`);
+    const code = user?.referralCode || `FIXO${user?.id || ''}`;
+    navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -132,6 +155,30 @@ export function Profile() {
               <option value="customer">Customer</option>
               <option value="technician">Technician (if registered)</option>
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-2 flex items-center gap-1.5"><Gift size={14} className="text-primary" /> Referral Code (optional)</label>
+            <input
+              data-testid="input-referral-code"
+              type="text"
+              value={loginForm.referralCode}
+              onChange={e => {
+                const val = e.target.value.toUpperCase();
+                setLoginForm({ ...loginForm, referralCode: val });
+                if (val.length >= 8) checkReferralCode(val);
+                else setReferralValidation(null);
+              }}
+              className="w-full px-4 py-3 rounded-xl bg-background border-2 border-border focus:border-primary outline-none transition-colors"
+              placeholder="e.g. FIX12345"
+              maxLength={10}
+            />
+            {checkingReferral && <p className="text-xs text-muted-foreground mt-1">Checking code...</p>}
+            {referralValidation?.valid && (
+              <p className="text-xs text-green-600 mt-1 flex items-center gap-1"><CheckCircle size={12} />Valid! Referred by {referralValidation.name} — you'll get 10% off your first booking!</p>
+            )}
+            {referralValidation && !referralValidation.valid && (
+              <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={12} />Invalid referral code</p>
+            )}
           </div>
           <button
             data-testid="button-login"
@@ -281,12 +328,28 @@ export function Profile() {
           </div>
         </div>
 
+        {/* Discount available banner */}
+        {user.discountAvailable && (
+          <div className="glass rounded-2xl p-4 border border-green-500/30 bg-green-50/50 dark:bg-green-900/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-500/10 rounded-full flex items-center justify-center shrink-0">
+                <Tag size={18} className="text-green-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-green-700 dark:text-green-400">10% Referral Discount Available!</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Your discount will be auto-applied on your next booking.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Referral Code */}
         <div className="glass rounded-2xl p-5">
-          <h3 className="font-semibold mb-3">{t('invite_friend')}</h3>
+          <h3 className="font-semibold mb-1 flex items-center gap-2"><Gift size={16} className="text-primary" />{t('invite_friend')}</h3>
+          <p className="text-xs text-muted-foreground mb-3">Share your code — friends get 10% off their first booking!</p>
           <div className="flex items-center gap-3">
-            <div className="flex-1 px-4 py-2.5 bg-muted rounded-xl font-mono font-bold tracking-widest text-primary">
-              FIXO{user.id}
+            <div className="flex-1 px-4 py-2.5 bg-muted rounded-xl font-mono font-bold tracking-widest text-primary" data-testid="text-referral-code">
+              {user.referralCode || `FIXO${user.id}`}
             </div>
             <button
               data-testid="button-copy-referral"
@@ -296,7 +359,9 @@ export function Profile() {
               {copied ? <><CheckCircle size={14} />Copied!</> : <><Copy size={14} />Copy</>}
             </button>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">Share this code — your friend gets 10% off their first booking!</p>
+          {user.referredBy && (
+            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1"><CheckCircle size={11} className="text-green-500" />Referred by code: <span className="font-mono font-semibold">{user.referredBy}</span></p>
+          )}
         </div>
 
         {user.role === 'admin' && (

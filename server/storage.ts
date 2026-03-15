@@ -21,7 +21,8 @@ export interface IStorage {
   // USERS
   getUser(id: number): Promise<User | undefined>;
   getOrCreateUserByFullName(fullName: string, role?: string, email?: string): Promise<User>;
-  updateUser(id: number, data: Partial<Pick<InsertUser, 'fullName' | 'email' | 'phone' | 'profilePhoto' | 'language' | 'verificationStatus'>>): Promise<User>;
+  updateUser(id: number, data: Partial<Pick<InsertUser, 'fullName' | 'email' | 'phone' | 'profilePhoto' | 'language' | 'verificationStatus' | 'referralCode' | 'referredBy' | 'discountAvailable'>>): Promise<User>;
+  getUserByReferralCode(code: string): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   updateUserRole(id: number, role: string): Promise<User>;
   suspendUser(id: number, suspended: boolean): Promise<User>;
@@ -105,8 +106,13 @@ export class DatabaseStorage implements IStorage {
     return u;
   }
 
-  async updateUser(id: number, data: Partial<Pick<InsertUser, 'fullName' | 'email' | 'phone' | 'profilePhoto' | 'language' | 'verificationStatus'>>) {
+  async updateUser(id: number, data: Partial<Pick<InsertUser, 'fullName' | 'email' | 'phone' | 'profilePhoto' | 'language' | 'verificationStatus' | 'referralCode' | 'referredBy' | 'discountAvailable'>>) {
     const [u] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return u;
+  }
+
+  async getUserByReferralCode(code: string) {
+    const [u] = await db.select().from(users).where(eq(users.referralCode, code));
     return u;
   }
 

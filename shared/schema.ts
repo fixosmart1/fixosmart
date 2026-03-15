@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   profilePhoto: text("profile_photo"),
   suspended: boolean("suspended").default(false),
   verificationStatus: text("verification_status"), // null | pending | under_review | approved | rejected
+  discountAvailable: boolean("discount_available").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useLanguage } from "@/hooks/use-language";
 import { useAuth, useServices, useProducts, useCreateBooking, useValidatePromo } from "@/hooks/use-api";
-import { Check, ChevronRight, AlertTriangle, Tag, X } from "lucide-react";
+import { Check, ChevronRight, AlertTriangle, Tag, X, Gift } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export function Booking() {
@@ -53,10 +53,14 @@ export function Booking() {
     return total;
   };
 
+  const referralDiscount = !!user?.discountAvailable && !formData.promoValidated;
+
   const calcTotal = () => {
     const sub = calcSubtotal();
-    const discount = formData.promoValidated ? Math.round(sub * formData.discountPercent / 100) : 0;
-    return { sub, discount, total: sub - discount };
+    const promoDiscount = formData.promoValidated ? Math.round(sub * formData.discountPercent / 100) : 0;
+    const refDiscount = referralDiscount ? Math.round(sub * 10 / 100) : 0;
+    const discount = promoDiscount + refDiscount;
+    return { sub, discount, promoDiscount, refDiscount, total: sub - discount };
   };
 
   const handleApplyPromo = async () => {
@@ -79,7 +83,7 @@ export function Booking() {
   const handleBack = () => setStep(s => Math.max(s - 1, 1));
 
   const handleSubmit = async () => {
-    const { sub, discount, total } = calcTotal();
+    const { sub, discount, total, refDiscount } = calcTotal();
     try {
       await createBooking.mutateAsync({
         userId: user!.id,
@@ -95,6 +99,9 @@ export function Booking() {
         promoCode: formData.promoValidated ? formData.promoCode.toUpperCase() : null,
         discountSar: discount.toString(),
       });
+      if (refDiscount > 0) {
+        await fetch('/api/referral/consume', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      }
       toast({ title: "Booking confirmed! 🎉", description: `Total: ${total} SAR. We'll contact you soon.` });
       const msg = encodeURIComponent(`New Booking\nName: ${user!.fullName}\nDate: ${formData.bookingDate}\nDist: ${formData.district}\nTotal: ${total} SAR`);
       window.open(`https://wa.me/966500000000?text=${msg}`, '_blank');
@@ -118,7 +125,7 @@ export function Booking() {
     );
   }
 
-  const { sub, discount, total } = calcTotal();
+  const { sub, discount, total, refDiscount, promoDiscount } = calcTotal();
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -130,6 +137,16 @@ export function Booking() {
           ))}
         </div>
       </div>
+
+      {referralDiscount && (
+        <div className="glass border border-green-500/30 bg-green-50/50 dark:bg-green-900/10 rounded-2xl p-4 flex items-center gap-3" data-testid="banner-referral-discount">
+          <Gift size={20} className="text-green-600 shrink-0" />
+          <div>
+            <p className="font-semibold text-green-700 dark:text-green-400 text-sm">10% Referral Discount Active!</p>
+            <p className="text-xs text-muted-foreground">Your referral bonus will be deducted automatically from your total.</p>
+          </div>
+        </div>
+      )}
 
       <div className="glass p-6 md:p-8 rounded-3xl relative overflow-hidden">
         {isEmergency && (
@@ -333,10 +350,16 @@ export function Booking() {
                     </>
                   ) : null;
                 })()}
-                {discount > 0 && (
+                {refDiscount > 0 && (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span className="flex items-center gap-1"><Gift size={13} /> Referral Discount (10% off)</span>
+                    <span>-{refDiscount} SAR</span>
+                  </div>
+                )}
+                {promoDiscount > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
                     <span>Promo ({formData.discountPercent}% off)</span>
-                    <span>-{discount} SAR</span>
+                    <span>-{promoDiscount} SAR</span>
                   </div>
                 )}
                 <div className="pt-2 border-t border-border flex justify-between font-bold text-base">
