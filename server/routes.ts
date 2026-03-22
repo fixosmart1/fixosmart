@@ -7,30 +7,53 @@ import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import crypto from "crypto";
 
-// Cryptographically secure session store
-const sessions = new Map<string, number>(); // sessionToken -> userId
+// Hybrid session store: in-memory cache (L1) + PostgreSQL (L2 / persistence)
+const sessionCache = new Map<string, number>(); // token -> userId (process-local cache)
 
 function getSessionToken(req: any): string | null {
   return req.headers['x-session-token'] || req.cookies?.session_token || null;
 }
 
-function setSession(res: any, userId: number): string {
+async function setSession(res: any, userId: number): Promise<string> {
   const token = crypto.randomBytes(32).toString('hex');
-  sessions.set(token, userId);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  sessionCache.set(token, userId);
+  // Persist to DB so other serverless instances can verify the session
+  try {
+    await db.insert(schema.sessionStore).values({ token, userId, expiresAt })
+      .onConflictDoUpdate({ target: schema.sessionStore.token, set: { userId, expiresAt } });
+  } catch (e) {
+    // Non-fatal: in-memory session still works for this instance
+    console.error('Session DB write error:', e);
+  }
   res.cookie('session_token', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
   return token;
 }
 
-function getSessionUser(req: any): number | null {
+async function getSessionUser(req: any): Promise<number | null> {
   const token = getSessionToken(req);
   if (!token) return null;
-  return sessions.get(token) || null;
+  // L1: check in-process cache first
+  const cached = sessionCache.get(token);
+  if (cached) return cached;
+  // L2: check DB (needed when served by a different serverless instance)
+  try {
+    const rows = await db.select().from(schema.sessionStore)
+      .where(eq(schema.sessionStore.token, token));
+    if (rows.length && rows[0].expiresAt > new Date()) {
+      sessionCache.set(token, rows[0].userId); // warm cache
+      return rows[0].userId;
+    }
+  } catch (e) {
+    console.error('Session DB read error:', e);
+  }
+  return null;
 }
 
 // ─── Auth Middleware ──────────────────────────────────────────────────────────
 
 async function requireAuth(req: any, res: Response, next: NextFunction) {
-  const userId = getSessionUser(req);
+  const userId = await getSessionUser(req);
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
   const user = await storage.getUser(userId);
   if (!user) return res.status(401).json({ message: "Unauthorized" });
@@ -41,7 +64,7 @@ async function requireAuth(req: any, res: Response, next: NextFunction) {
 
 function requireRole(...roles: string[]) {
   return async (req: any, res: Response, next: NextFunction) => {
-    const userId = getSessionUser(req);
+    const userId = await getSessionUser(req);
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
     const user = await storage.getUser(userId);
     if (!user || !roles.includes(user.role || 'customer')) {
@@ -125,7 +148,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // ===== AUTH =====
   app.get('/api/me', async (req, res) => {
-    const userId = getSessionUser(req);
+    const userId = await getSessionUser(req);
     if (!userId) return res.json(null);
     const user = await storage.getUser(userId);
     res.json(user || null);
@@ -151,11 +174,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           }
         }
         const updated = await storage.updateUser(user.id, updates);
-        setSession(res, user.id);
+        await setSession(res, user.id);
         return res.json(updated);
       }
 
-      setSession(res, user.id);
+      await setSession(res, user.id);
       res.json(user);
     } catch (err) {
       res.status(500).json({ message: "Login failed" });
@@ -208,9 +231,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json({ deducted: deduct });
   });
 
-  app.post('/api/logout', (req: any, res) => {
+  app.post('/api/logout', async (req: any, res) => {
     const token = getSessionToken(req);
-    if (token) sessions.delete(token);
+    if (token) {
+      sessionCache.delete(token);
+      try {
+        await db.delete(schema.sessionStore).where(eq(schema.sessionStore.token, token));
+      } catch (e) {
+        // non-fatal
+      }
+    }
     res.clearCookie('session_token');
     res.json({ ok: true });
   });

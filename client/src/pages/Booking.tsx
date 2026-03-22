@@ -36,7 +36,7 @@ export function Booking() {
   });
   const [useWallet, setUseWallet] = useState(false);
 
-  const districts = ["Al-Safa", "Al-Hamra", "Al-Rawdah", "Obhur", "Al-Nazlah", "Al-Basateen", "Al-Marwah", "Al-Sharafiyah", "Al-Balad"];
+  const districts = ["Al-Safa", "Al-Hamra", "Al-Rawdah", "Obhur", "Al-Nazlah", "Al-Basateen", "Al-Marwah", "Al-Sharafiyah", "Al-Balad", "Al-Musrifah",];
 
   const calcSubtotal = () => {
     let total = 0;

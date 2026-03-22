@@ -1,0 +1,154 @@
+You are a senior full-stack engineer and deployment specialist.
+
+Your task is to fully audit, fix, and prepare my project for production deployment without breaking any existing working features.
+
+## PROJECT CONTEXT
+
+* App Name: FixoSmart
+* Stack: React + TypeScript + Vite + Express + PostgreSQL (Drizzle ORM)
+* Auth (current): custom hooks (useAuth)
+* New integration: Supabase (auth + future DB)
+* Hosting: Vercel
+* Code: GitHub repo already connected
+* Domain: [www.fixosmart.com](http://www.fixosmart.com)
+
+## CONNECTED SERVICES
+
+* Supabase Project URL: https://tdswmmtwhpxxycpoifwr.supabase.co
+* Supabase Public Key: sb_publishable_ICM6oRsZdJtGSl-qz2sRqg_yJFdtOp0
+* GitHub Repo: https://github.com/fixosmart1/fixosmart
+* Vercel Project: already connected
+* Domain: already connected in Vercel
+
+---
+
+## YOUR OBJECTIVE
+
+Make the entire system production-ready so that:
+
+* Visiting [www.fixosmart.com](http://www.fixosmart.com) loads the app correctly
+* No 404 errors
+* No blank screen
+* No broken routes
+* No backend crashes
+* No authentication conflicts
+
+---
+
+## CRITICAL RULES
+
+1. DO NOT break existing working features
+2. DO NOT remove existing auth (useAuth) yet
+3. ADD Supabase safely without replacing current system
+4. FIX instead of rewriting
+5. Keep system stable first, then improve
+
+---
+
+## TASKS TO COMPLETE
+
+### 1. ROUTING FIX
+
+* Ensure all pages (Dashboard, Login, etc.) are properly registered in router (wouter)
+* Fix 404 issues
+* Ensure default route (/) loads correctly
+
+---
+
+### 2. EXPORT FIX
+
+* Ensure all pages use correct default export
+* Fix named vs default export mismatch
+
+---
+
+### 3. FRONTEND BUILD FIX
+
+* Fix Vite config if needed
+* Ensure app builds without errors
+* Fix large chunk warnings if critical
+
+---
+
+### 4. SUPABASE SAFE INTEGRATION
+
+* Ensure supabase client is correctly configured
+* Do NOT override existing auth
+* Add Supabase as secondary system (parallel mode)
+* Fix any env/config issues
+
+---
+
+### 5. BACKEND STABILITY
+
+* Ensure Express server does not crash
+* If unused, safely isolate backend
+* Prevent port conflicts
+
+---
+
+### 6. VERCEL DEPLOYMENT FIX
+
+* Ensure correct framework preset (Vite / static)
+* Fix build command
+* Fix output directory (dist/public or correct build path)
+* Ensure no NOT_FOUND error
+
+---
+
+### 7. DOMAIN FIX (VERY IMPORTANT)
+
+* Ensure [www.fixosmart.com](http://www.fixosmart.com) points to correct deployment
+* Fix DNS issues if needed
+* Prevent file download bug (wrong build output)
+
+---
+
+### 8. ERROR DETECTION
+
+* Detect and fix:
+
+  * routing errors
+  * build errors
+  * JSON errors
+  * port conflicts
+  * missing scripts
+  * auth issues
+
+---
+
+### 9. FINAL RESULT REQUIREMENT
+
+After your fixes:
+
+* App must open successfully on:
+  → [www.fixosmart.com](http://www.fixosmart.com)
+
+* System must:
+  ✔ Load homepage/dashboard
+  ✔ No 404
+  ✔ No blank screen
+  ✔ No crash
+  ✔ Clean console (no critical errors)
+
+---
+
+## OUTPUT FORMAT
+
+1. List all issues found
+2. Show what you fixed
+3. Show updated files (only changed parts)
+4. Give final deployment status
+
+---
+
+## PRIORITY
+
+1. Fix app loading
+2. Fix routing
+3. Fix deployment
+4. Then improve system
+
+---
+
+Act carefully, do not rush, and ensure stability.

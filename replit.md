@@ -7,7 +7,8 @@ FixoSmart is a trilingual (EN/BN/AR) smart home maintenance and repair marketpla
 - **Frontend**: React + TypeScript + TailwindCSS + Framer Motion + Wouter
 - **Backend**: Express.js + TypeScript
 - **Database**: PostgreSQL via Drizzle ORM
-- **Auth**: Session-based (cookie + in-memory Map, cryptographically secure tokens via `crypto.randomBytes`)
+- **Auth**: Session-based (cookie + hybrid session store: in-memory cache L1 + PostgreSQL `session_store` table L2 — serverless-safe)
+- **Supabase**: Client configured in `client/src/lib/supabase.ts` using `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` env vars (falls back to hardcoded project credentials)
 
 ## Architecture
 - `shared/schema.ts` — Drizzle ORM table definitions + Zod schemas
@@ -85,6 +86,17 @@ users, technicians, services, products, bookings, reviews, iqamaTrackers, subscr
 - `.glass` class: backdrop-blur card panels
 - `.sos-pulse` animation on SOS button
 - Dark mode supported via CSS variables + ThemeToggle
+
+## Deployment (Vercel)
+- **Target**: www.fixosmart.com on Vercel
+- **API Handler**: `api/[...path].ts` — Vercel catch-all serverless function wrapping the full Express app
+- **vercel.json**: Routes `/api/:path*` → `api/[...path]` function; all other paths → `/index.html` (SPA fallback)
+- **Build**: `npm run build` → Vite frontend (`dist/public/`) + esbuild server (`dist/index.cjs`) + esbuild Vercel handler (`dist/api/index.cjs`)
+- **Required Vercel env vars**: `DATABASE_URL`, `SESSION_SECRET`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+- **Session persistence**: `session_store` PostgreSQL table (serverless-safe; survives function cold starts)
+
+## Database Tables
+users, technicians, services, products, bookings, reviews, iqamaTrackers, subscriptions, promoCodes, serviceAddons, siteSettings, session_store
 
 ## Running
 ```

@@ -1,16 +1,16 @@
-import { useState } from "react";
-import { useLanguage } from "@/hooks/use-language";
-import { useAuth, useBookings, useIqamaTrackers, useServices, useProducts, useCreateReview } from "@/hooks/use-api";
+import { useState } from "react"
+import { useLanguage } from "@/hooks/use-language"
+import { useAuth, useBookings, useIqamaTrackers, useServices, useProducts, useCreateReview } from "@/hooks/use-api"
 import {
   Calendar, CloudSun, Compass, FileText, ArrowRight, Wrench,
   Star, X, CheckCircle, MapPin, Tag, Zap, Bell, Phone,
   MessageCircle, Navigation, RefreshCw, Clock, ShoppingBag,
   CreditCard, Shield, Flame, Repeat2, ChevronRight, Sparkles
-} from "lucide-react";
-import { Link } from "wouter";
-import { format, differenceInDays, parseISO, isAfter } from "date-fns";
-import { useToast } from "@/hooks/use-toast";
-import { motion, AnimatePresence } from "framer-motion";
+} from "lucide-react"
+import { Link } from "wouter"
+import { format, differenceInDays, parseISO, isAfter } from "date-fns"
+import { useToast } from "@/hooks/use-toast"
+import { motion, AnimatePresence } from "framer-motion"
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<string, { label: string; labelBn: string; labelAr: string; color: string }> = {
@@ -123,14 +123,14 @@ const stagger = {
 };
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
-export function Dashboard() {
-  const { t, language, isRtl } = useLanguage();
-  const { data: user } = useAuth();
-  const { data: bookings = [], isLoading: loadingBookings } = useBookings();
-  const { data: iqamas = [] } = useIqamaTrackers();
-  const { data: services = [] } = useServices();
-  const { data: products = [] } = useProducts();
-  const [reviewBooking, setReviewBooking] = useState<any>(null);
+  export function Dashboard() {
+    const { t, language, isRtl } = useLanguage();
+    const { data: user } = useAuth();
+    const { data: bookings = [], isLoading: loadingBookings } = useBookings();
+    const { data: iqamas = [] } = useIqamaTrackers();
+    const { data: services = [] } = useServices();
+    const { data: products = [] } = useProducts();
+    const [reviewBooking, setReviewBooking] = useState<any>(null);
 
   const dir = isRtl ? 'rtl' : 'ltr';
   const T = (en: string, bn: string, ar: string) => language === 'bn' ? bn : language === 'ar' ? ar : en;

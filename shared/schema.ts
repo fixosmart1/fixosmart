@@ -232,3 +232,10 @@ export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
 
 export type PromoCode = typeof promoCodes.$inferSelect;
 export type InsertPromoCode = z.infer<typeof insertPromoCodeSchema>;
+
+// SESSION STORE — DB-backed sessions for multi-instance/serverless compatibility
+export const sessionStore = pgTable("session_store", {
+  token: text("token").primaryKey(),
+  userId: integer("user_id").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
