@@ -52,7 +52,7 @@ function RequireAuth({ children, allowedRoles }: { children: ReactNode; allowedR
   useEffect(() => {
     if (isLoading) return;
     if (!user) {
-      setLocation('/profile');
+      setLocation('/login');
       return;
     }
     if (allowedRoles && !allowedRoles.includes(user.role || 'customer')) {

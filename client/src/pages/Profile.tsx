@@ -3,9 +3,12 @@ import { useLanguage } from "@/hooks/use-language";
 import { useAuth, useLogin, useLogout, useUpdateProfile } from "@/hooks/use-api";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { User, Mail, Phone, Globe, Shield, Copy, CheckCircle, Edit2, Save, X, Camera, Gift, Tag, AlertCircle, Users, Wallet, Award, ExternalLink, MessageCircle } from "lucide-react";
+import { User, Mail, Phone, Globe, Shield, Copy, CheckCircle, Edit2, Save, X, Camera, Gift, Tag, AlertCircle, Users, Wallet, Award, ExternalLink, MessageCircle, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { FcGoogle } from "react-icons/fc";
+import { supabase, getRedirectUrl } from "@/lib/supabase";
+import { apiRequest, queryClient, saveSessionToken } from "@/lib/queryClient";
 
 export function Profile() {
   const { t, language, setLanguage } = useLanguage();
@@ -23,6 +26,8 @@ export function Profile() {
   });
   const [referralValidation, setReferralValidation] = useState<{ valid: boolean; name?: string } | null>(null);
   const [checkingReferral, setCheckingReferral] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleError, setGoogleError] = useState("");
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -70,6 +75,22 @@ export function Profile() {
       setEditing(false);
     } catch (err: any) {
       toast({ title: "Update failed", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
+    setGoogleError("");
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: getRedirectUrl(),
+        queryParams: { access_type: "offline", prompt: "consent" },
+      },
+    });
+    if (error) {
+      setGoogleError(error.message);
+      setGoogleLoading(false);
     }
   };
 
@@ -153,6 +174,25 @@ export function Profile() {
           </div>
           <h1 className="text-2xl font-bold">{t('login')}</h1>
           <p className="text-muted-foreground mt-1">Sign in to access FixoSmart services</p>
+        </div>
+
+        {/* Google OAuth */}
+        <div className="glass p-5 rounded-2xl space-y-3">
+          <button
+            data-testid="button-google-login"
+            onClick={handleGoogleLogin}
+            disabled={googleLoading}
+            className="w-full flex items-center justify-center gap-3 border border-border rounded-xl py-3 px-4 text-sm font-medium hover:bg-muted transition-colors disabled:opacity-60 bg-background"
+          >
+            {googleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FcGoogle className="w-5 h-5" />}
+            Continue with Google
+          </button>
+          {googleError && <p className="text-xs text-red-500 text-center">{googleError}</p>}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-muted-foreground">or sign in with name</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
         </div>
 
         <form onSubmit={handleLogin} className="glass p-6 rounded-2xl space-y-4">
