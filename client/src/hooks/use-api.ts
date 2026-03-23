@@ -56,9 +56,23 @@ export function useAuth() {
       const token = getStoredToken();
       const headers: Record<string, string> = {};
       if (token) headers["x-session-token"] = token;
-      const res = await fetch('/api/me', { credentials: 'include', headers });
-      if (!res.ok) return null;
-      return res.json();
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+
+      try {
+        const res = await fetch('/api/me', {
+          credentials: 'include',
+          headers,
+          signal: controller.signal,
+        });
+        if (!res.ok) return null;
+        return res.json().catch(() => null);
+      } catch {
+        return null;
+      } finally {
+        clearTimeout(timeout);
+      }
     },
     retry: false,
     staleTime: 30000,

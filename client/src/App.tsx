@@ -7,7 +7,7 @@ import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import AuthCallback from "@/pages/AuthCallback";
 import { useAuth } from "@/hooks/use-api";
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
 
 import { LanguageProvider } from "./hooks/use-language";
 import { Layout } from "./components/Layout";
@@ -182,11 +182,18 @@ function Router() {
 
 // ─── AppInner — global auth gate ─────────────────────────────────────────────
 // Renders the full app only after the initial /api/me check resolves.
-// Prevents any blank white screen while the session cookie is being validated.
+// Safety: always renders within 8s even if the API never responds.
 
 function AppInner() {
   const { isLoading } = useAuth();
-  if (isLoading) return <LoadingScreen message="Starting FixoSmart..." />;
+  const [safeToRender, setSafeToRender] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setSafeToRender(true), 8000);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (isLoading && !safeToRender) return <LoadingScreen message="Starting FixoSmart..." />;
   return <Router />;
 }
 
