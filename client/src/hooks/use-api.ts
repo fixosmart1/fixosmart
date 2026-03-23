@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { saveSessionToken, clearSessionToken } from "@/lib/queryClient";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -12,8 +13,24 @@ function buildUrl(path: string, params?: Record<string, string | number>): strin
   return url;
 }
 
+function getStoredToken(): string | null {
+  try { return localStorage.getItem("fixo_session"); } catch { return null; }
+}
+
+function sessionHeaders(extra?: Record<string, string>): Record<string, string> {
+  const token = getStoredToken();
+  const h: Record<string, string> = { ...extra };
+  if (token) h["x-session-token"] = token;
+  return h;
+}
+
 async function apiFetch(path: string, options?: RequestInit) {
-  const res = await fetch(path, { credentials: 'include', ...options });
+  const existingHeaders = (options?.headers as Record<string, string>) || {};
+  const res = await fetch(path, {
+    credentials: 'include',
+    ...options,
+    headers: sessionHeaders(existingHeaders),
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
     throw new Error(err.message || 'Request failed');
@@ -36,7 +53,10 @@ export function useAuth() {
   return useQuery({
     queryKey: ['/api/me'],
     queryFn: async () => {
-      const res = await fetch('/api/me', { credentials: 'include' });
+      const token = getStoredToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["x-session-token"] = token;
+      const res = await fetch('/api/me', { credentials: 'include', headers });
       if (!res.ok) return null;
       return res.json();
     },
@@ -50,7 +70,10 @@ export function useLogin() {
   return useMutation({
     mutationFn: (data: { fullName: string; email?: string; role?: string }) =>
       jsonMutation('POST', '/api/login', data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['/api/me'] }),
+    onSuccess: (data: any) => {
+      if (data?._token) saveSessionToken(data._token);
+      qc.invalidateQueries({ queryKey: ['/api/me'] });
+    },
   });
 }
 
@@ -58,7 +81,11 @@ export function useLogout() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => jsonMutation('POST', '/api/logout'),
-    onSuccess: () => { qc.clear(); qc.setQueryData(['/api/me'], null); },
+    onSuccess: () => {
+      clearSessionToken();
+      qc.clear();
+      qc.setQueryData(['/api/me'], null);
+    },
   });
 }
 

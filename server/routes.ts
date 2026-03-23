@@ -14,6 +14,8 @@ function getSessionToken(req: any): string | null {
   return req.headers['x-session-token'] || req.cookies?.session_token || null;
 }
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 async function setSession(res: any, userId: number): Promise<string> {
   const token = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -26,7 +28,12 @@ async function setSession(res: any, userId: number): Promise<string> {
     // Non-fatal: in-memory session still works for this instance
     console.error('Session DB write error:', e);
   }
-  res.cookie('session_token', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
+  res.cookie('session_token', token, {
+    httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    sameSite: isProduction ? 'none' : 'lax',
+    secure: isProduction,
+  });
   return token;
 }
 
@@ -174,12 +181,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           }
         }
         const updated = await storage.updateUser(user.id, updates);
-        await setSession(res, user.id);
-        return res.json(updated);
+        const token = await setSession(res, user.id);
+        return res.json({ ...updated, _token: token });
       }
 
-      await setSession(res, user.id);
-      res.json(user);
+      const token = await setSession(res, user.id);
+      res.json({ ...user, _token: token });
     } catch (err) {
       res.status(500).json({ message: "Login failed" });
     }
@@ -241,8 +248,29 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         // non-fatal
       }
     }
-    res.clearCookie('session_token');
+    res.clearCookie('session_token', {
+      sameSite: isProduction ? 'none' : 'lax',
+      secure: isProduction,
+    });
     res.json({ ok: true });
+  });
+
+  // ===== SUPABASE AUTH BRIDGE =====
+  // After Supabase OAuth/OTP, frontend posts the user's email to get a cookie session
+  app.post('/api/supabase-auth', async (req: any, res) => {
+    try {
+      const { email, fullName } = req.body;
+      if (!email) return res.status(400).json({ message: 'Email required' });
+      // Find existing user by email, or create new customer account
+      const name = fullName || email.split('@')[0];
+      const user = await storage.getOrCreateUserByFullName(name, 'customer', email);
+      if (user.suspended) return res.status(403).json({ message: 'Account suspended' });
+      const token = await setSession(res, user.id);
+      res.json({ user, token });
+    } catch (err: any) {
+      console.error('Supabase auth bridge error:', err);
+      res.status(500).json({ message: 'Auth failed' });
+    }
   });
 
   // ===== PROFILE =====

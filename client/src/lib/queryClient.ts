@@ -1,5 +1,26 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+const SESSION_KEY = "fixo_session";
+
+export function saveSessionToken(token: string) {
+  try { localStorage.setItem(SESSION_KEY, token); } catch {}
+}
+
+export function clearSessionToken() {
+  try { localStorage.removeItem(SESSION_KEY); } catch {}
+}
+
+function getSessionToken(): string | null {
+  try { return localStorage.getItem(SESSION_KEY); } catch { return null; }
+}
+
+function buildHeaders(extra?: Record<string, string>): Record<string, string> {
+  const token = getSessionToken();
+  const headers: Record<string, string> = { ...extra };
+  if (token) headers["x-session-token"] = token;
+  return headers;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -14,7 +35,7 @@ export async function apiRequest(
 ): Promise<Response> {
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: buildHeaders(data ? { "Content-Type": "application/json" } : {}),
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -31,6 +52,7 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const res = await fetch(queryKey.join("/") as string, {
       credentials: "include",
+      headers: buildHeaders(),
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

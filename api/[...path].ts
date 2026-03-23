@@ -1,8 +1,15 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cookieParser from "cookie-parser";
 import { registerRoutes } from "../server/routes";
 import { createServer } from "http";
 import path from "path";
 import fs from "fs";
+
+const ALLOWED_ORIGINS = [
+  "https://www.fixosmart.com",
+  "https://fixosmart.com",
+  "https://fixosmart.vercel.app",
+];
 
 const app = express();
 const httpServer = createServer(app);
@@ -13,6 +20,19 @@ declare module "http" {
   }
 }
 
+// CORS — allow credentials from production origins
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const origin = req.headers.origin || "";
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-session-token");
+  }
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
+
 app.use(
   express.json({
     verify: (req, _res, buf) => {
@@ -22,6 +42,7 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
 
 // Cache initialization so warm serverless starts skip re-seeding
 let initPromise: Promise<void> | null = null;

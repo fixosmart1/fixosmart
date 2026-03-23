@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
+import AuthCallback from "@/pages/AuthCallback";
 import { useAuth } from "@/hooks/use-api";
 import { ReactNode, useEffect } from "react";
 
@@ -76,6 +77,7 @@ function Router() {
         {/* Public customer pages */}
         <Route path="/" component={Home} />
         <Route path="/login" component={Login} />
+        <Route path="/auth/callback" component={AuthCallback} />
         <Route path="/services" component={Services} />
         <Route path="/services/:id" component={ServiceDetail} />
         <Route path="/products" component={Products} />

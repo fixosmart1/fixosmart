@@ -23,6 +23,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getOrCreateUserByFullName(fullName: string, role?: string, email?: string): Promise<User>;
   updateUser(id: number, data: Partial<Pick<InsertUser, 'fullName' | 'email' | 'phone' | 'profilePhoto' | 'language' | 'verificationStatus' | 'referralCode' | 'referredBy' | 'discountAvailable' | 'walletBalance'>>): Promise<User>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   getUserByReferralCode(code: string): Promise<User | undefined>;
   getReferralCount(referralCode: string): Promise<number>;
   addWalletBalance(userId: number, amount: number): Promise<void>;
@@ -118,6 +119,11 @@ export class DatabaseStorage implements IStorage {
 
   async updateUser(id: number, data: Partial<Pick<InsertUser, 'fullName' | 'email' | 'phone' | 'profilePhoto' | 'language' | 'verificationStatus' | 'referralCode' | 'referredBy' | 'discountAvailable'>>) {
     const [u] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return u;
+  }
+
+  async getUserByEmail(email: string) {
+    const [u] = await db.select().from(users).where(eq(users.email, email));
     return u;
   }
 
