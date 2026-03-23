@@ -44,8 +44,8 @@ app.use(
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
-// Cache initialization so warm serverless starts skip re-seeding
 let initPromise: Promise<void> | null = null;
+let initError: Error | null = null;
 
 async function initialize() {
   await registerRoutes(httpServer, app);
@@ -57,7 +57,7 @@ async function initialize() {
     return res.status(status).json({ message });
   });
 
-  // Serve the Vite-built frontend as static files
+  // Static files not needed in Vercel (CDN serves them), but kept for safety
   const distPath = path.resolve(process.cwd(), "dist/public");
   if (fs.existsSync(distPath)) {
     app.use(express.static(distPath));
@@ -67,12 +67,25 @@ async function initialize() {
   }
 }
 
-initPromise = initialize().catch(console.error);
+// Start initialization immediately; capture any error so handler can respond fast
+initPromise = initialize().catch((err) => {
+  initError = err;
+  console.error("[vercel-handler] initialization failed:", err);
+});
 
-// Vercel expects either a handler function or an Express app as the default export.
-// We wrap to ensure initialization completes before the first request.
 const handler = async (req: Request, res: Response) => {
-  await initPromise;
+  try {
+    await initPromise;
+  } catch (_) {}
+
+  // If init failed, return a clear error rather than hanging
+  if (initError) {
+    return res.status(503).json({
+      message: "Service temporarily unavailable. Please check server logs.",
+      error: initError.message,
+    });
+  }
+
   (app as any)(req, res);
 };
 

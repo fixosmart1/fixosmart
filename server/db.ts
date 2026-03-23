@@ -10,5 +10,14 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  connectionTimeoutMillis: 5000,
+  idleTimeoutMillis: 30000,
+  max: 10,
+  ssl: process.env.DATABASE_URL.includes("supabase") || process.env.DATABASE_URL.includes("neon")
+    ? { rejectUnauthorized: false }
+    : undefined,
+});
+
 export const db = drizzle(pool, { schema });
