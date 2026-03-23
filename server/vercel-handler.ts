@@ -1,6 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
-import { registerRoutes } from "../server/routes";
+import { registerRoutes } from "./routes";
 import { createServer } from "http";
 import path from "path";
 import fs from "fs";

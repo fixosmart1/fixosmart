@@ -8,6 +8,7 @@ const allowlist = [
   "@google/generative-ai",
   "axios",
   "connect-pg-simple",
+  "cookie-parser",
   "cors",
   "date-fns",
   "drizzle-orm",
@@ -70,7 +71,7 @@ async function buildAll() {
   console.log("building Vercel API handler...");
   await esbuild({
     ...sharedBuildConfig,
-    entryPoints: ["api/[...path].ts"],
+    entryPoints: ["server/vercel-handler.ts"],
     outfile: "dist/api/index.cjs",
   });
 }
