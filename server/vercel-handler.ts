@@ -12,7 +12,7 @@ async function ensureSchema() {
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       full_name TEXT NOT NULL,
-      email TEXT,
+      email TEXT UNIQUE,
       phone TEXT,
       role TEXT DEFAULT 'customer',
       language TEXT DEFAULT 'en',
@@ -78,6 +78,15 @@ async function ensureSchema() {
     ALTER TABLE products ADD COLUMN IF NOT EXISTS description_en TEXT;
     ALTER TABLE products ADD COLUMN IF NOT EXISTS affiliate_link TEXT;
     ALTER TABLE products ADD COLUMN IF NOT EXISTS installation_fee_sar NUMERIC DEFAULT 99;
+    -- Add UNIQUE constraint on users.email if it doesn't already exist
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'users_email_key' AND conrelid = 'users'::regclass
+      ) THEN
+        ALTER TABLE users ADD CONSTRAINT users_email_key UNIQUE (email);
+      END IF;
+    END $$;
     CREATE TABLE IF NOT EXISTS bookings (
       id SERIAL PRIMARY KEY,
       user_id INTEGER REFERENCES users(id),

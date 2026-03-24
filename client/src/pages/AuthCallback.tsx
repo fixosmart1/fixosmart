@@ -12,8 +12,8 @@ export default function AuthCallback() {
 
   useEffect(() => {
     const done = (ok: boolean, msg: string, redirectTo = "/dashboard") => {
-      if (handled.current && ok) return;
-      handled.current = ok;
+      if (handled.current) return;
+      handled.current = true;
       setStatus(ok ? "success" : "error");
       setMessage(msg);
       setTimeout(() => setLocation(ok ? redirectTo : "/login"), 1200);

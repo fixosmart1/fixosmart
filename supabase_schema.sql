@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   full_name TEXT NOT NULL,
-  email TEXT,
+  email TEXT UNIQUE,
   phone TEXT,
   role TEXT DEFAULT 'customer',
   language TEXT DEFAULT 'en',
@@ -184,7 +184,17 @@ INSERT INTO site_settings (key, value, label, type) VALUES
   ('contact_whatsapp', '+966542418449', 'WhatsApp Contact', 'text')
 ON CONFLICT (key) DO NOTHING;
 
+-- Add UNIQUE constraint on email if not already present
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'users_email_key' AND conrelid = 'users'::regclass
+  ) THEN
+    ALTER TABLE users ADD CONSTRAINT users_email_key UNIQUE (email);
+  END IF;
+END $$;
+
 -- Seed admin user (only if not already present)
-INSERT INTO users (full_name, email, role) VALUES
-  ('fixosmart', 'admin@fixosmart.com', 'admin')
-ON CONFLICT DO NOTHING;
+INSERT INTO users (full_name, email, role)
+SELECT 'fixosmart', 'admin@fixosmart.com', 'admin'
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin@fixosmart.com');
