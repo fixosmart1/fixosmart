@@ -63,6 +63,8 @@ async function ensureSchema() {
       price_sar NUMERIC NOT NULL, image_url TEXT,
       is_active BOOLEAN DEFAULT true
     );
+    ALTER TABLE services ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+    ALTER TABLE services ADD COLUMN IF NOT EXISTS description_en TEXT;
     CREATE TABLE IF NOT EXISTS products (
       id SERIAL PRIMARY KEY,
       name_bn TEXT NOT NULL, name_en TEXT NOT NULL, name_ar TEXT NOT NULL,
@@ -72,6 +74,10 @@ async function ensureSchema() {
       affiliate_link TEXT, image_url TEXT,
       is_active BOOLEAN DEFAULT true
     );
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS description_en TEXT;
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS affiliate_link TEXT;
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS installation_fee_sar NUMERIC DEFAULT 99;
     CREATE TABLE IF NOT EXISTS bookings (
       id SERIAL PRIMARY KEY,
       user_id INTEGER REFERENCES users(id),
@@ -146,8 +152,8 @@ async function ensureSchema() {
       ('contact_whatsapp','+966542418449','WhatsApp Contact','text')
     ON CONFLICT (key) DO NOTHING;
     INSERT INTO users (full_name, email, role)
-      VALUES ('fixosmart', 'admin@fixosmart.com', 'admin')
-    ON CONFLICT DO NOTHING;
+    SELECT 'fixosmart', 'admin@fixosmart.com', 'admin'
+    WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin@fixosmart.com');
   `);
 }
 
