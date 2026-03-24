@@ -11,82 +11,62 @@ export default function AuthCallback() {
   const handled = useRef(false);
 
   useEffect(() => {
-    const bridge = async (email: string, fullName?: string) => {
-      if (handled.current) return;
-      handled.current = true;
-      try {
-        const res = await apiRequest("POST", "/api/supabase-auth", { email, fullName });
-        const data = await res.json();
-        if (data?.token) saveSessionToken(data.token);
-        await queryClient.invalidateQueries({ queryKey: ["/api/me"] });
-        setStatus("success");
-        setMessage("Signed in! Redirecting…");
-        setTimeout(() => setLocation("/dashboard"), 1200);
-      } catch (err: any) {
-        handled.current = false;
-        throw err;
-      }
-    };
-
-    const fail = (msg: string) => {
-      if (handled.current) return;
-      setStatus("error");
+    const done = (ok: boolean, msg: string, redirectTo = "/dashboard") => {
+      if (handled.current && ok) return;
+      handled.current = ok;
+      setStatus(ok ? "success" : "error");
       setMessage(msg);
-      setTimeout(() => setLocation("/login"), 3000);
+      setTimeout(() => setLocation(ok ? redirectTo : "/login"), 1200);
     };
 
-    // Strategy 1: listen for Supabase auth state change (best for PKCE flow)
-    // Supabase automatically exchanges the code when detectSessionInUrl: true
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session?.user?.email) {
-        try {
-          await bridge(session.user.email, session.user.user_metadata?.full_name);
-        } catch (err: any) {
-          fail(err?.message || "Sign-in failed. Please try again.");
-        }
-      }
-    });
+    const bridge = async (email: string, fullName?: string) => {
+      const res = await apiRequest("POST", "/api/supabase-auth", { email, fullName });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Auth bridge failed");
+      if (data?.token) saveSessionToken(data.token);
+      await queryClient.invalidateQueries({ queryKey: ["/api/me"] });
+    };
 
-    // Strategy 2: also try immediately in case session is already available
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user?.email) {
-        try {
-          await bridge(session.user.email, session.user.user_metadata?.full_name);
-        } catch (err: any) {
-          fail(err?.message || "Sign-in failed. Please try again.");
-        }
-      }
-    });
-
-    // Strategy 3: manual PKCE code exchange fallback
-    const tryCodeExchange = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
-      if (!code || handled.current) return;
+    const run = async () => {
       try {
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) throw error;
-        if (data.session?.user?.email) {
-          await bridge(data.session.user.email, data.session.user.user_metadata?.full_name);
+        // Step 1: exchange the PKCE code using the full URL (most reliable method)
+        // Supabase reads the code + code_verifier from localStorage automatically
+        const { data: exchanged, error: exchErr } =
+          await supabase.auth.exchangeCodeForSession(window.location.href);
+
+        if (!exchErr && exchanged?.session?.user?.email) {
+          await bridge(
+            exchanged.session.user.email,
+            exchanged.session.user.user_metadata?.full_name
+          );
+          done(true, "Signed in! Redirecting…");
+          return;
         }
+
+        // Step 2: maybe the session was already established (e.g. page refresh on callback)
+        const { data: { session }, error: sessErr } = await supabase.auth.getSession();
+        if (!sessErr && session?.user?.email) {
+          await bridge(session.user.email, session.user.user_metadata?.full_name);
+          done(true, "Signed in! Redirecting…");
+          return;
+        }
+
+        // If we reach here nothing worked
+        const reason = exchErr?.message || sessErr?.message || "No session found";
+        done(false, reason);
       } catch (err: any) {
-        fail(err?.message || "Sign-in failed. Please try again.");
+        done(false, err?.message || "Sign-in failed. Please try again.");
       }
     };
 
-    // Give Strategy 1 & 2 a head-start, then try manual exchange
-    const codeTimer = setTimeout(tryCodeExchange, 1500);
+    run();
 
-    // Safety timeout: if nothing worked in 20s, show error
-    const safetyTimer = setTimeout(() => {
-      fail("Sign-in timed out. Please try again.");
-    }, 20000);
+    // Absolute safety net — should never be reached if run() works
+    const timeout = setTimeout(() => {
+      if (!handled.current) done(false, "Sign-in timed out. Please try again.");
+    }, 25000);
 
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(codeTimer);
-      clearTimeout(safetyTimer);
-    };
+    return () => clearTimeout(timeout);
   }, []);
 
   return (

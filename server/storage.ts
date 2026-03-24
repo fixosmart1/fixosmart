@@ -109,12 +109,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getOrCreateUserByFullName(fullName: string, role?: string, email?: string) {
-    const where = email
-      ? await db.select().from(users).where(eq(users.email, email))
-      : await db.select().from(users).where(eq(users.fullName, fullName));
-    if (where.length > 0) return where[0];
-    const [u] = await db.insert(users).values({ fullName, role: role || "customer", email }).returning();
-    return u;
+    // Always check by email first if provided (most reliable identifier)
+    if (email) {
+      const byEmail = await db.select().from(users).where(eq(users.email, email));
+      if (byEmail.length > 0) return byEmail[0];
+    } else {
+      const byName = await db.select().from(users).where(eq(users.fullName, fullName));
+      if (byName.length > 0) return byName[0];
+    }
+    // Safe insert: if a concurrent request already created the user, return that row
+    try {
+      const [u] = await db.insert(users)
+        .values({ fullName, role: role || "customer", email })
+        .returning();
+      return u;
+    } catch (insertErr: any) {
+      // Unique constraint violation — another request created the user first
+      if (insertErr?.code === "23505") {
+        const fallback = email
+          ? await db.select().from(users).where(eq(users.email, email))
+          : await db.select().from(users).where(eq(users.fullName, fullName));
+        if (fallback.length > 0) return fallback[0];
+      }
+      throw insertErr;
+    }
   }
 
   async updateUser(id: number, data: Partial<Pick<InsertUser, 'fullName' | 'email' | 'phone' | 'profilePhoto' | 'language' | 'verificationStatus' | 'referralCode' | 'referredBy' | 'discountAvailable'>>) {

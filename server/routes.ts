@@ -261,15 +261,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const { email, fullName } = req.body;
       if (!email) return res.status(400).json({ message: 'Email required' });
-      // Find existing user by email, or create new customer account
-      const name = fullName || email.split('@')[0];
+      const name = (fullName || email.split('@')[0]).trim() || 'User';
       const user = await storage.getOrCreateUserByFullName(name, 'customer', email);
+      if (!user) return res.status(500).json({ message: 'Failed to create or find user' });
       if (user.suspended) return res.status(403).json({ message: 'Account suspended' });
       const token = await setSession(res, user.id);
       res.json({ user, token });
     } catch (err: any) {
-      console.error('Supabase auth bridge error:', err);
-      res.status(500).json({ message: 'Auth failed' });
+      console.error('Supabase auth bridge error:', {
+        message: err.message,
+        code: err.code,
+        detail: err.detail,
+      });
+      res.status(500).json({
+        message: 'Database error saving new user',
+        detail: err.code === '42P01' ? 'Table does not exist — run schema setup' : err.message,
+      });
     }
   });
 
