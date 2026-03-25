@@ -3,16 +3,18 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import * as schema from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray, desc, sql, and, or } from "drizzle-orm";
+import { z } from "zod";
 import crypto from "crypto";
 
-// --- AUTH & SESSION SYSTEM ---
+// --- GLOBAL CONFIG & SESSION CACHE ---
 const sessionCache = new Map<string, number>();
 
 function getSessionToken(req: any): string | null {
   return req.headers["x-session-token"] || req.cookies?.session_token || null;
 }
 
+// FIXED: setSession for fixosmart.com (Lax + Secure for Redirects)
 async function setSession(res: any, userId: number): Promise<string> {
   const token = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -31,12 +33,12 @@ async function setSession(res: any, userId: number): Promise<string> {
     console.error("Session DB write error:", e);
   }
 
-  // SameSite=Lax ensures the cookie is sent after the redirect from Supabase
+  // Cross-domain friendly cookie for your custom domain
   res.cookie("session_token", token, {
     httpOnly: true,
     maxAge: 7 * 24 * 60 * 60 * 1000,
     sameSite: "lax", 
-    secure: true,
+    secure: true,    // Required for HTTPS fixosmart.com
     path: "/",
   });
 
@@ -63,19 +65,50 @@ async function getSessionUser(req: any): Promise<number | null> {
   return null;
 }
 
+// --- AUTH MIDDLEWARES ---
 async function requireAuth(req: any, res: Response, next: NextFunction) {
   const userId = await getSessionUser(req);
   if (!userId) return res.status(401).json({ message: "Unauthorized" });
   const user = await storage.getUser(userId);
-  if (!user || user.suspended) return res.status(403).json({ message: "Forbidden" });
+  if (!user) return res.status(401).json({ message: "Unauthorized" });
+  if (user.suspended)
+    return res.status(403).json({ message: "Account suspended" });
   req.currentUser = user;
   next();
 }
 
-// --- MAIN ROUTE HANDLER ---
-export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
+function requireRole(...roles: string[]) {
+  return async (req: any, res: Response, next: NextFunction) => {
+    const userId = await getSessionUser(req);
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const user = await storage.getUser(userId);
+    if (!user || !roles.includes(user.role || "customer")) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    if (user.suspended)
+      return res.status(403).json({ message: "Account suspended" });
+    req.currentUser = user;
+    next();
+  };
+}
 
-  // Manual Cookie Parser Middleware
+// --- INITIAL SEED DATA (Your Original Content) ---
+async function seedDatabase() {
+  const svc = await storage.getServices();
+  if (svc.length === 0) {
+    await db.insert(schema.services).values([
+      { nameBn: "এসি মেরামত", nameEn: "AC Repair", nameAr: "إصلاح مكيفات", descriptionEn: "Professional AC servicing", category: "AC", priceSar: "150", imageUrl: "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=600" },
+      { nameBn: "বৈদ্যুতিক কাজ", nameEn: "Electrical Work", nameAr: "أعمال كهربائية", descriptionEn: "Certified electrical repair", category: "Electric", priceSar: "100", imageUrl: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=600" },
+      { nameBn: "প্লাম্বিং", nameEn: "Plumbing", nameAr: "سبাكة", descriptionEn: "Pipe fitting and leaks", category: "Plumbing", priceSar: "120", imageUrl: "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=600" },
+      { nameBn: "স্মার্ট হোম", nameEn: "Smart Home", nameAr: "المنزل الذكي", descriptionEn: "Automation setup", category: "Smart", priceSar: "200", imageUrl: "https://images.unsplash.com/photo-1558002038-1055907df827?w=600" },
+      { nameBn: "সিসিটিভি", nameEn: "CCTV Setup", nameAr: "تركيب كاميرات", descriptionEn: "Security camera installation", category: "Security", priceSar: "250", imageUrl: "https://images.unsplash.com/photo-1557597774-9d273605dfa9?w=600" }
+    ]);
+  }
+}
+
+// --- ROUTE REGISTRATION ---
+export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
+  // Manual Cookie Parser
   app.use((req: any, res: any, next: any) => {
     const cookieHeader = req.headers.cookie || "";
     req.cookies = Object.fromEntries(
@@ -87,7 +120,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     next();
   });
 
-  // User Identity Route
+  // User Identity
   app.get("/api/me", async (req, res) => {
     const userId = await getSessionUser(req);
     if (!userId) return res.json(null);
@@ -95,75 +128,37 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(user || null);
   });
 
-  // --- FIXED AUTH BRIDGE (Handles 405 and Session missing) ---
-  const handleAuthBridge = async (req: any, res: any) => {
+  // Supabase Auth Integration (Handling GET/POST for fixosmart.com)
+  const authHandler = async (req: any, res: any) => {
     try {
-      // Get data from body (POST) or query (GET/Redirect)
       const email = req.body?.email || req.query?.email;
       const fullName = req.body?.fullName || req.query?.fullName;
-
       if (!email) {
-        // If coming back from redirect without params, just go home
         if (req.method === "GET") return res.redirect("/");
         return res.status(400).json({ message: "Email required" });
       }
-
-      const user = await storage.getOrCreateUserByFullName(
-        (fullName || email.split("@")[0]).trim(), 
-        "customer", 
-        email
-      );
-
-      if (user.suspended) return res.status(403).json({ message: "Account suspended" });
-
+      const user = await storage.getOrCreateUserByFullName(fullName || email.split("@")[0], "customer", email);
+      if (user.suspended) return res.status(403).json({ message: "Suspended" });
       const token = await setSession(res, user.id);
-
-      // If it's a browser redirect (GET), send them to the dashboard/home
-      if (req.method === "GET") {
-        return res.redirect("/");
-      }
-
+      if (req.method === "GET") return res.redirect("/");
       res.json({ user, token });
     } catch (err: any) {
-      console.error("Auth Bridge Error:", err);
-      res.status(500).json({ message: "Authentication failed" });
+      res.status(500).json({ message: "Auth failed", detail: err.message });
     }
   };
+  app.post("/api/supabase-auth", authHandler);
+  app.get("/api/supabase-auth", authHandler);
 
-  // Accept both methods to prevent 405 error
-  app.post("/api/supabase-auth", handleAuthBridge);
-  app.get("/api/supabase-auth", handleAuthBridge);
-
-  app.post("/api/logout", async (req: any, res) => {
-    const token = getSessionToken(req);
-    if (token) {
-      sessionCache.delete(token);
-      await db.delete(schema.sessionStore).where(eq(schema.sessionStore.token, token)).catch(() => {});
-    }
-    res.clearCookie("session_token", { sameSite: "lax", secure: true, path: "/" });
-    res.json({ ok: true });
+  // Profile & Users
+  app.get("/api/admin/users", requireRole("admin"), async (req, res) => {
+    res.json(await storage.getAllUsers());
   });
 
-  // --- BUSINESS ROUTES ---
-  app.get("/api/services", async (req, res) => {
-    res.json(await storage.getServices());
+  app.patch("/api/profile", requireAuth, async (req: any, res) => {
+    res.json(await storage.updateUser(req.currentUser.id, req.body));
   });
 
-  app.get("/api/bookings", requireAuth, async (req: any, res) => {
-    const data = req.currentUser.role === "admin" 
-      ? await storage.getBookings() 
-      : await storage.getBookings(req.currentUser.id);
-    res.json(data);
-  });
-
-  app.post("/api/bookings", requireAuth, async (req, res) => {
-    try {
-      res.status(201).json(await storage.createBooking(req.body));
-    } catch (err) {
-      res.status(400).json({ message: "Booking failed" });
-    }
-  });
-
+  // IQAMA TRACKER SYSTEM
   app.get("/api/iqama", requireAuth, async (req: any, res) => {
     res.json(await storage.getIqamaTrackers(req.currentUser.id));
   });
@@ -176,6 +171,44 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     await storage.deleteIqamaTracker(Number(req.params.id));
     res.status(204).send();
   });
+
+  // SERVICES & BOOKINGS
+  app.get("/api/services", async (req, res) => res.json(await storage.getServices()));
+
+  app.get("/api/bookings", requireAuth, async (req: any, res) => {
+    const bookings = req.currentUser.role === "admin" 
+      ? await storage.getBookings() 
+      : await storage.getBookings(req.currentUser.id);
+    res.json(bookings);
+  });
+
+  app.post("/api/bookings", requireAuth, async (req, res) => {
+    try {
+      res.status(201).json(await storage.createBooking(req.body));
+    } catch (err) {
+      res.status(400).json({ message: "Booking failed" });
+    }
+  });
+
+  // SITE SETTINGS
+  app.get("/api/settings", async (req, res) => {
+    const all = await storage.getSiteSettings();
+    const map: Record<string, string> = {};
+    for (const s of all) map[s.key] = s.value;
+    res.json(map);
+  });
+
+  app.post("/api/logout", async (req: any, res) => {
+    const token = getSessionToken(req);
+    if (token) {
+      sessionCache.delete(token);
+      await db.delete(schema.sessionStore).where(eq(schema.sessionStore.token, token)).catch(() => {});
+    }
+    res.clearCookie("session_token", { sameSite: "lax", secure: true, path: "/" });
+    res.json({ ok: true });
+  });
+
+  seedDatabase().catch(console.error);
 
   return httpServer;
 }
