@@ -43,13 +43,22 @@ export default function Login() {
 
   const bridgeSession = async (email: string, fullName?: string) => {
     try {
-      const res = await apiRequest("POST", "/api/supabase-auth", { email, fullName });
+      const res = await fetch("/api/supabase-auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, fullName }),
+      });
       const data = await res.json();
+      if (!res.ok) {
+        setError(data?.detail || data?.message || `Server error ${res.status}`);
+        return;
+      }
       if (data?.token) saveSessionToken(data.token);
       await queryClient.invalidateQueries({ queryKey: ["/api/me"] });
       setLocation("/dashboard");
     } catch (err: any) {
-      setError("Could not create session. Please try again.");
+      setError(`Network error: ${err?.message || "Could not reach server"}`);
     }
   };
 

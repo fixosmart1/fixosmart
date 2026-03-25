@@ -8,11 +8,12 @@ import fs from "fs";
 
 // Auto-create all tables on cold start so production DB is always ready
 async function ensureSchema() {
+  // Step 1: Create all tables (safe — IF NOT EXISTS)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       full_name TEXT NOT NULL,
-      email TEXT UNIQUE,
+      email TEXT,
       phone TEXT,
       role TEXT DEFAULT 'customer',
       language TEXT DEFAULT 'en',
@@ -63,8 +64,6 @@ async function ensureSchema() {
       price_sar NUMERIC NOT NULL, image_url TEXT,
       is_active BOOLEAN DEFAULT true
     );
-    ALTER TABLE services ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
-    ALTER TABLE services ADD COLUMN IF NOT EXISTS description_en TEXT;
     CREATE TABLE IF NOT EXISTS products (
       id SERIAL PRIMARY KEY,
       name_bn TEXT NOT NULL, name_en TEXT NOT NULL, name_ar TEXT NOT NULL,
@@ -74,19 +73,6 @@ async function ensureSchema() {
       affiliate_link TEXT, image_url TEXT,
       is_active BOOLEAN DEFAULT true
     );
-    ALTER TABLE products ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
-    ALTER TABLE products ADD COLUMN IF NOT EXISTS description_en TEXT;
-    ALTER TABLE products ADD COLUMN IF NOT EXISTS affiliate_link TEXT;
-    ALTER TABLE products ADD COLUMN IF NOT EXISTS installation_fee_sar NUMERIC DEFAULT 99;
-    -- Add UNIQUE constraint on users.email if it doesn't already exist
-    DO $$ BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint
-        WHERE conname = 'users_email_key' AND conrelid = 'users'::regclass
-      ) THEN
-        ALTER TABLE users ADD CONSTRAINT users_email_key UNIQUE (email);
-      END IF;
-    END $$;
     CREATE TABLE IF NOT EXISTS bookings (
       id SERIAL PRIMARY KEY,
       user_id INTEGER REFERENCES users(id),
@@ -150,6 +136,34 @@ async function ensureSchema() {
       user_id INTEGER NOT NULL,
       expires_at TIMESTAMP NOT NULL
     );
+  `);
+
+  // Step 2: Add missing columns to existing tables (idempotent ALTER TABLE)
+  await pool.query(`
+    ALTER TABLE services ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+    ALTER TABLE services ADD COLUMN IF NOT EXISTS description_en TEXT;
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS description_en TEXT;
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS affiliate_link TEXT;
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS installation_fee_sar NUMERIC DEFAULT 99;
+  `);
+
+  // Step 3: Add UNIQUE constraint on users.email (separate query — DO block needs its own call)
+  await pool.query(`
+    DO $body$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'users_email_key' AND conrelid = 'users'::regclass
+      ) THEN
+        ALTER TABLE users ADD CONSTRAINT users_email_key UNIQUE (email);
+      END IF;
+    END
+    $body$;
+  `);
+
+  // Step 4: Seed default data
+  await pool.query(`
     INSERT INTO site_settings (key, value, label, type) VALUES
       ('hero_image_url','https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=900&fit=crop','Hero Image URL','text'),
       ('hero_stat_rating','4.9 / 5','Rating Stat','text'),
@@ -164,6 +178,25 @@ async function ensureSchema() {
     SELECT 'fixosmart', 'admin@fixosmart.com', 'admin'
     WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin@fixosmart.com');
   `);
+  // Step 5: Enable Row Level Security on all public tables (idempotent)
+  // Our backend uses the postgres superuser role which bypasses RLS,
+  // so enabling it only affects direct PostgREST/anon access (which we don't use).
+  await pool.query(`
+    ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE technicians ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE technician_verifications ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE services ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE service_addons ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE iqama_trackers ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE promo_codes ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE site_settings ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE session_store ENABLE ROW LEVEL SECURITY;
+  `);
+  console.log('[ensureSchema] All tables and migrations applied successfully');
 }
 
 const ALLOWED_ORIGINS = [
