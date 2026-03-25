@@ -131,19 +131,26 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Supabase Auth Integration (Handling GET/POST for fixosmart.com)
   const authHandler = async (req: any, res: any) => {
     try {
-      const email = req.body?.email || req.query?.email;
-      const fullName = req.body?.fullName || req.query?.fullName;
+      const email = (req.body?.email || req.query?.email || "").trim();
+      const fullName = (req.body?.fullName || req.query?.fullName || "").trim();
+      console.log(`[supabase-auth] method=${req.method} email=${email} fullName=${fullName}`);
       if (!email) {
         if (req.method === "GET") return res.redirect("/");
         return res.status(400).json({ message: "Email required" });
       }
-      const user = await storage.getOrCreateUserByFullName(fullName || email.split("@")[0], "customer", email);
-      if (user.suspended) return res.status(403).json({ message: "Suspended" });
+      const user = await storage.getOrCreateUserByFullName(
+        fullName || email.split("@")[0],
+        "customer",
+        email
+      );
+      console.log(`[supabase-auth] user resolved: id=${user.id} role=${user.role}`);
+      if (user.suspended) return res.status(403).json({ message: "Account suspended" });
       const token = await setSession(res, user.id);
-      if (req.method === "GET") return res.redirect("/");
+      if (req.method === "GET") return res.redirect("/dashboard");
       res.json({ user, token });
     } catch (err: any) {
-      res.status(500).json({ message: "Auth failed", detail: err.message });
+      console.error("[supabase-auth] ERROR:", err);
+      res.status(500).json({ message: "Auth failed", detail: err?.message || String(err) });
     }
   };
   app.post("/api/supabase-auth", authHandler);

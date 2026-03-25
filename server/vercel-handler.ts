@@ -196,7 +196,54 @@ async function ensureSchema() {
     ALTER TABLE site_settings ENABLE ROW LEVEL SECURITY;
     ALTER TABLE session_store ENABLE ROW LEVEL SECURITY;
   `);
-  console.log('[ensureSchema] All tables and migrations applied successfully');
+
+  // Step 5b: Enable RLS on the Supabase-managed profiles table (fixes Security Advisor error)
+  await pool.query(`
+    DO $body$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='profiles') THEN
+        EXECUTE 'ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY';
+      END IF;
+    END
+    $body$;
+  `);
+
+  // Step 6: Fix handle_new_user trigger function — add SET search_path (fixes security warning)
+  // and guard against NULL/missing fields to prevent auth failures.
+  await pool.query(`
+    DO $body$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'public' AND p.proname = 'handle_new_user'
+      ) THEN
+        EXECUTE $func$
+          CREATE OR REPLACE FUNCTION public.handle_new_user()
+          RETURNS trigger
+          LANGUAGE plpgsql
+          SECURITY DEFINER SET search_path = public
+          AS $inner$
+          BEGIN
+            INSERT INTO public.profiles (id, full_name, email, avatar_url, role, language)
+            VALUES (
+              new.id,
+              COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', ''),
+              COALESCE(new.email, ''),
+              COALESCE(new.raw_user_meta_data->>'avatar_url', ''),
+              'customer',
+              'en'
+            )
+            ON CONFLICT (id) DO NOTHING;
+            RETURN new;
+          END;
+          $inner$;
+        $func$;
+      END IF;
+    END
+    $body$;
+  `);
+
+  console.log('[ensureSchema] All tables, migrations, RLS, and function fixes applied successfully');
 }
 
 const ALLOWED_ORIGINS = [

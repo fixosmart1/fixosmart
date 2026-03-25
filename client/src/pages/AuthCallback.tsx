@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { apiRequest, queryClient, saveSessionToken } from "@/lib/queryClient";
+import { queryClient, saveSessionToken } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { Loader2, CheckCircle, AlertCircle } from "lucide-react";
 
@@ -16,13 +16,21 @@ export default function AuthCallback() {
       handled.current = true;
       setStatus(ok ? "success" : "error");
       setMessage(msg);
-      setTimeout(() => setLocation(ok ? redirectTo : "/login"), 1200);
+      setTimeout(() => setLocation(ok ? redirectTo : "/login"), 2500);
     };
 
     const bridge = async (email: string, fullName?: string) => {
-      const res = await apiRequest("POST", "/api/supabase-auth", { email, fullName });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Auth bridge failed");
+      const res = await fetch("/api/supabase-auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, fullName }),
+      });
+      let data: any = {};
+      try { data = await res.json(); } catch (_) {}
+      if (!res.ok) {
+        throw new Error(data?.detail || data?.message || `Server error ${res.status}: ${res.statusText}`);
+      }
       if (data?.token) saveSessionToken(data.token);
       await queryClient.invalidateQueries({ queryKey: ["/api/me"] });
     };
