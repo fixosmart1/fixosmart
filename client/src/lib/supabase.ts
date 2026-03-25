@@ -15,13 +15,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
     storageKey: "fixosmart-auth",
     storage: window.localStorage,
-    flowType: "pkce",
+    flowType: "pkce", // PKCE flow ডোমেইন পরিবর্তনের প্রতি খুব সংবেদনশীল
   },
 });
 
-export const PRODUCTION_URL = "https://www.fixosmart.com";
 export const getRedirectUrl = () => {
-  const isProd = window.location.hostname === "www.fixosmart.com" ||
-    window.location.hostname === "fixosmart.com";
-  return isProd ? `${PRODUCTION_URL}/auth/callback` : `${window.location.origin}/auth/callback`;
+  // হার্ডকোডেড URL এর বদলে বর্তমান অরিজিন ব্যবহার করা সবচেয়ে নিরাপদ
+  // এতে www থাকুক বা না থাকুক, সেশন ঠিকঠাক কাজ করবে
+  const origin = window.location.origin;
+  return `${origin}/auth/callback`;
 };
