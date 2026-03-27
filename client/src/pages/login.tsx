@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase, getRedirectUrl } from "@/lib/supabase";
 import { useLocation } from "wouter";
-import { apiRequest, queryClient, saveSessionToken } from "@/lib/queryClient";
+import { queryClient, saveSessionToken } from "@/lib/queryClient";
 import { motion } from "framer-motion";
 import { Mail, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
@@ -13,24 +13,15 @@ export default function Login() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
   const [, setLocation] = useLocation();
+  // Prevent bridgeSession from firing more than once per page load
+  const bridging = useRef(false);
 
-  // Handle Supabase callback — runs on mount if redirected back after OAuth/OTP
+  // Handle Supabase callback — runs on mount if redirected back after OTP magic link
   useEffect(() => {
-    const syncSupabaseSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.email) {
-        await bridgeSession(
-          session.user.email,
-          session.user.user_metadata?.full_name || session.user.user_metadata?.name
-        );
-      }
-    };
-
-    syncSupabaseSession();
-
-    // Listen for future auth state changes (e.g. after OTP click-through)
+    // Only listen for SIGNED_IN (not TOKEN_REFRESHED) to avoid loops
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session?.user?.email) {
+      if (event === "SIGNED_IN" && session?.user?.email && !bridging.current) {
+        bridging.current = true;
         await bridgeSession(
           session.user.email,
           session.user.user_metadata?.full_name || session.user.user_metadata?.name
@@ -49,16 +40,17 @@ export default function Login() {
         credentials: "include",
         body: JSON.stringify({ email, fullName }),
       });
-      const data = await res.json();
+      let data: any = {};
+      try { data = await res.json(); } catch (_) {}
       if (!res.ok) {
-        setError(data?.detail || data?.message || `Server error ${res.status}`);
+        setError(data?.detail || data?.message || `Server error ${res.status} — check Vercel logs`);
         return;
       }
       if (data?.token) saveSessionToken(data.token);
       await queryClient.invalidateQueries({ queryKey: ["/api/me"] });
       setLocation("/dashboard");
     } catch (err: any) {
-      setError(`Network error: ${err?.message || "Could not reach server"}`);
+      setError(`Connection error: ${err?.message || "Could not reach server"}`);
     }
   };
 
