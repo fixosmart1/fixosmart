@@ -63,7 +63,14 @@ export default function Login() {
     });
     if (authErr || !data?.user?.email) {
       setLoading(false);
-      setError(authErr?.message || "Invalid email or password");
+      const msg = authErr?.message || "Invalid email or password";
+      if (msg.toLowerCase().includes("email not confirmed")) {
+        setError("Your email is not confirmed yet. Please check your inbox and click the confirmation link, then try again.");
+      } else if (msg.toLowerCase().includes("invalid login credentials")) {
+        setError("Incorrect email or password. Please try again.");
+      } else {
+        setError(msg);
+      }
       return;
     }
 
