@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { saveSessionToken, clearSessionToken } from "@/lib/queryClient";
+import { supabase } from "@/lib/supabase";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -94,7 +95,10 @@ export function useLogin() {
 export function useLogout() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => jsonMutation('POST', '/api/logout'),
+    mutationFn: async () => {
+      await jsonMutation('POST', '/api/logout');
+      await supabase.auth.signOut().catch(() => {});
+    },
     onSuccess: () => {
       clearSessionToken();
       qc.clear();

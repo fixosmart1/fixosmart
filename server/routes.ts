@@ -14,13 +14,17 @@ function getSessionToken(req: any): string | null {
   return req.headers["x-session-token"] || req.cookies?.session_token || null;
 }
 
-// FIXED: setSession for fixosmart.com (Lax + Secure for Redirects)
+const IS_PROD = process.env.NODE_ENV === "production";
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
 async function setSession(res: any, userId: number): Promise<string> {
   const token = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
 
+  // Store in memory cache for fast lookups
   sessionCache.set(token, userId);
 
+  // Persist to DB so sessions survive server restarts / Vercel cold starts
   try {
     await db
       .insert(schema.sessionStore)
@@ -30,19 +34,30 @@ async function setSession(res: any, userId: number): Promise<string> {
         set: { userId, expiresAt },
       });
   } catch (e) {
-    console.error("Session DB write error:", e);
+    console.error("[setSession] DB write error:", e);
   }
 
-  // Cross-domain friendly cookie for your custom domain
+  // Cookie — secure on production HTTPS, lax on dev
   res.cookie("session_token", token, {
     httpOnly: true,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    sameSite: "lax", 
-    secure: true,    // Required for HTTPS fixosmart.com
+    maxAge: SESSION_TTL_MS,
+    sameSite: IS_PROD ? "none" : "lax",
+    secure: IS_PROD,
     path: "/",
   });
 
   return token;
+}
+
+async function clearSession(req: any, res: any): Promise<void> {
+  const token = getSessionToken(req);
+  if (token) {
+    sessionCache.delete(token);
+    try {
+      await db.delete(schema.sessionStore).where(eq(schema.sessionStore.token, token));
+    } catch (_) {}
+  }
+  res.clearCookie("session_token", { path: "/" });
 }
 
 async function getSessionUser(req: any): Promise<number | null> {
@@ -156,6 +171,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/supabase-auth", authHandler);
   app.get("/api/supabase-auth", authHandler);
 
+  // Logout — clears session cookie + DB row + localStorage token on client
+  app.post("/api/logout", async (req, res) => {
+    await clearSession(req, res);
+    res.json({ ok: true });
+  });
+
   // Profile & Users
   app.get("/api/admin/users", requireRole("admin"), async (req, res) => {
     res.json(await storage.getAllUsers());
@@ -205,13 +226,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(map);
   });
 
-  app.post("/api/logout", async (req: any, res) => {
-    const token = getSessionToken(req);
-    if (token) {
-      sessionCache.delete(token);
-      await db.delete(schema.sessionStore).where(eq(schema.sessionStore.token, token)).catch(() => {});
-    }
-    res.clearCookie("session_token", { sameSite: "lax", secure: true, path: "/" });
+  app.post("/api/logout-legacy", async (req: any, res) => {
+    // kept for reference — real logout is at /api/logout above
     res.json({ ok: true });
   });
 
