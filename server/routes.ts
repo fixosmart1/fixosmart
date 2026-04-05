@@ -37,11 +37,11 @@ async function setSession(res: any, userId: number): Promise<string> {
     console.error("[setSession] DB write error:", e);
   }
 
-  // Cookie — secure on production HTTPS, lax on dev
+  // Cookie — httpOnly, lax same-site (API and frontend share fixosmart.com), secure on HTTPS
   res.cookie("session_token", token, {
     httpOnly: true,
     maxAge: SESSION_TTL_MS,
-    sameSite: IS_PROD ? "none" : "lax",
+    sameSite: "lax",
     secure: IS_PROD,
     path: "/",
   });
