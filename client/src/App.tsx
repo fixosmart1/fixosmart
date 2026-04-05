@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 import AuthCallback from "@/pages/AuthCallback";
+import ResetPassword from "@/pages/ResetPassword";
 import { useAuth } from "@/hooks/use-api";
 import { ReactNode, useEffect, useState } from "react";
 
@@ -78,6 +79,7 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/login" component={Login} />
         <Route path="/auth/callback" component={AuthCallback} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/services" component={Services} />
         <Route path="/services/:id" component={ServiceDetail} />
         <Route path="/products" component={Products} />
