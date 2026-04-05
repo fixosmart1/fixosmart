@@ -3,10 +3,10 @@ import { supabase, getRedirectUrl } from "@/lib/supabase";
 import { useLocation } from "wouter";
 import { queryClient, saveSessionToken } from "@/lib/queryClient";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, User } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, User, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
 
-type Tab = "login" | "register";
+type Tab = "login" | "register" | "forgot";
 
 export default function Login() {
   const [tab, setTab] = useState<Tab>("login");
@@ -21,9 +21,9 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const bridging = useRef(false);
 
+  const switchTab = (t: Tab) => { setTab(t); setError(""); setInfo(""); };
+
   // ── Bridge: Supabase email → Express integer session ──────────────────────
-  // After Supabase verifies credentials, we call our backend with the email.
-  // The backend looks up public.users (integer ID) and issues a session token.
   const bridge = async (email: string, name?: string) => {
     if (bridging.current) return;
     bridging.current = true;
@@ -56,25 +56,24 @@ export default function Login() {
     setLoading(true);
     setError("");
 
-    // Step 1: Verify credentials via Supabase Auth
     const { data, error: authErr } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
       password,
     });
+
     if (authErr || !data?.user?.email) {
       setLoading(false);
-      const msg = authErr?.message || "Invalid email or password";
-      if (msg.toLowerCase().includes("email not confirmed")) {
-        setError("Your email is not confirmed yet. Please check your inbox and click the confirmation link, then try again.");
-      } else if (msg.toLowerCase().includes("invalid login credentials")) {
-        setError("Incorrect email or password. Please try again.");
+      const msg = (authErr?.message || "").toLowerCase();
+      if (msg.includes("email not confirmed")) {
+        setError("Your email is not confirmed. Check your inbox for the confirmation link.");
+      } else if (msg.includes("invalid login credentials") || msg.includes("invalid credentials")) {
+        setError("Incorrect email or password. Forgot your password? Use the link below.");
       } else {
-        setError(msg);
+        setError(authErr?.message || "Login failed. Please try again.");
       }
       return;
     }
 
-    // Step 2: Bridge to our Express backend to get integer session
     await bridge(
       data.user.email,
       data.user.user_metadata?.full_name || data.user.user_metadata?.name
@@ -91,7 +90,6 @@ export default function Login() {
     setError("");
     setInfo("");
 
-    // Step 1: Create Supabase Auth account
     const { data, error: signUpErr } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
       password,
@@ -103,28 +101,53 @@ export default function Login() {
 
     if (signUpErr) {
       setLoading(false);
-      setError(signUpErr.message);
+      const msg = (signUpErr.message || "").toLowerCase();
+      if (msg.includes("already registered") || msg.includes("user already")) {
+        setError("This email is already registered. Sign in instead, or use Forgot Password if you can't remember your password.");
+      } else {
+        setError(signUpErr.message);
+      }
       return;
     }
 
-    // If email confirmation is disabled, session is returned immediately
+    // Email confirmation disabled → session returned immediately
     if (data?.session?.user?.email) {
       await bridge(data.session.user.email, fullName.trim());
       setLoading(false);
       return;
     }
 
-    // If email confirmation is required (session is null), show a message
+    // Email confirmation enabled → prompt user to confirm
     if (data?.user && !data?.session) {
       setLoading(false);
-      setInfo("Account created! Check your email to confirm your address, then log in.");
-      setTab("login");
+      setInfo("Account created! Check your email and click the confirmation link, then sign in.");
+      switchTab("login");
       setPassword("");
       return;
     }
 
     setLoading(false);
-    setError("Could not create account. Try a different email.");
+    setError("Could not create account. Please try again.");
+  };
+
+  // ── Forgot Password ────────────────────────────────────────────────────────
+  const handleForgotPassword = async () => {
+    if (!email.trim()) return setError("Enter your email address above first");
+    setLoading(true);
+    setError("");
+    setInfo("");
+
+    const { error: resetErr } = await supabase.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      { redirectTo: `${window.location.origin}/auth/callback` }
+    );
+
+    setLoading(false);
+    if (resetErr) {
+      setError(resetErr.message || "Could not send reset email. Try again.");
+    } else {
+      setInfo(`Password reset email sent to ${email.trim()}. Check your inbox and click the link to set a new password.`);
+    }
   };
 
   // ── Google OAuth ───────────────────────────────────────────────────────────
@@ -142,11 +165,13 @@ export default function Login() {
       setError(error.message);
       setGoogleLoading(false);
     }
-    // Browser redirects to Google — loading stays true
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") tab === "login" ? handleLogin() : handleRegister();
+    if (e.key !== "Enter") return;
+    if (tab === "login") handleLogin();
+    else if (tab === "register") handleRegister();
+    else handleForgotPassword();
   };
 
   return (
@@ -165,27 +190,46 @@ export default function Login() {
 
         <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
 
-          {/* Tab Switch */}
-          <div className="flex rounded-xl bg-muted p-1 mb-5">
-            {(["login", "register"] as Tab[]).map((t) => (
+          {/* Tab Switch — hidden on forgot password screen */}
+          {tab !== "forgot" && (
+            <div className="flex rounded-xl bg-muted p-1 mb-5">
+              {(["login", "register"] as Tab[]).map((t) => (
+                <button
+                  key={t}
+                  data-testid={`tab-${t}`}
+                  onClick={() => switchTab(t)}
+                  className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    tab === t
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t === "login" ? "Sign In" : "Register"}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Forgot Password header */}
+          {tab === "forgot" && (
+            <div className="mb-5">
               <button
-                key={t}
-                data-testid={`tab-${t}`}
-                onClick={() => { setTab(t); setError(""); setInfo(""); }}
-                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  tab === t
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                onClick={() => switchTab("login")}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
               >
-                {t === "login" ? "Sign In" : "Register"}
+                <ArrowLeft className="w-4 h-4" /> Back to Sign In
               </button>
-            ))}
-          </div>
+              <h2 className="text-base font-semibold">Forgot Password?</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                Enter your email and we'll send you a reset link.
+              </p>
+            </div>
+          )}
 
           {/* Info Banner */}
           {info && (
-            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-xl text-xs text-blue-700 dark:text-blue-300">
+            <div className="mb-4 flex items-start gap-2 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-xl text-xs text-green-700 dark:text-green-300">
+              <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
               {info}
             </div>
           )}
@@ -201,7 +245,7 @@ export default function Login() {
           <AnimatePresence mode="wait">
             <motion.div
               key={tab}
-              initial={{ opacity: 0, x: tab === "login" ? -10 : 10 }}
+              initial={{ opacity: 0, x: tab === "forgot" ? 10 : tab === "login" ? -10 : 10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
@@ -210,9 +254,7 @@ export default function Login() {
               {/* Full Name (register only) */}
               {tab === "register" && (
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                    Full Name
-                  </label>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Full Name</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input
@@ -230,9 +272,7 @@ export default function Login() {
 
               {/* Email */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                  Email Address
-                </label>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Email Address</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <input
@@ -248,68 +288,85 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Password */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                  Password
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    data-testid="input-password"
-                    type={showPass ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => { setPassword(e.target.value); setError(""); }}
-                    onKeyDown={handleKeyDown}
-                    placeholder={tab === "register" ? "At least 6 characters" : "Your password"}
-                    autoComplete={tab === "login" ? "current-password" : "new-password"}
-                    className="w-full pl-10 pr-10 py-2.5 bg-background border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
+              {/* Password (not on forgot tab) */}
+              {tab !== "forgot" && (
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                      data-testid="input-password"
+                      type={showPass ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                      onKeyDown={handleKeyDown}
+                      placeholder={tab === "register" ? "At least 6 characters" : "Your password"}
+                      autoComplete={tab === "login" ? "current-password" : "new-password"}
+                      className="w-full pl-10 pr-10 py-2.5 bg-background border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                    <button
+                      type="button"
+                      data-testid="button-toggle-password"
+                      onClick={() => setShowPass(!showPass)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Forgot password link (login tab only) */}
+              {tab === "login" && (
+                <div className="flex justify-end">
                   <button
+                    data-testid="button-forgot-password"
                     type="button"
-                    data-testid="button-toggle-password"
-                    onClick={() => setShowPass(!showPass)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => switchTab("forgot")}
+                    className="text-xs text-primary hover:underline"
                   >
-                    {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    Forgot password?
                   </button>
                 </div>
-              </div>
+              )}
 
               {/* Submit Button */}
               <button
-                data-testid={tab === "login" ? "button-login" : "button-register"}
-                onClick={tab === "login" ? handleLogin : handleRegister}
+                data-testid={tab === "login" ? "button-login" : tab === "register" ? "button-register" : "button-reset-password"}
+                onClick={tab === "login" ? handleLogin : tab === "register" ? handleRegister : handleForgotPassword}
                 disabled={loading}
                 className="w-full bg-primary text-primary-foreground py-2.5 px-4 rounded-xl text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2 mt-1"
               >
                 {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                {tab === "login" ? "Sign In" : "Create Account"}
+                {tab === "login" ? "Sign In" : tab === "register" ? "Create Account" : "Send Reset Link"}
               </button>
             </motion.div>
           </AnimatePresence>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3 my-4">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-xs text-muted-foreground">or</span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
+          {/* Divider + Google (not on forgot tab) */}
+          {tab !== "forgot" && (
+            <>
+              <div className="flex items-center gap-3 my-4">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-xs text-muted-foreground">or</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
 
-          {/* Google OAuth */}
-          <button
-            data-testid="button-google-login"
-            onClick={handleGoogle}
-            disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 border border-border rounded-xl py-2.5 px-4 text-sm font-medium hover:bg-muted transition-colors disabled:opacity-60"
-          >
-            {googleLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FcGoogle className="w-5 h-5" />
-            )}
-            Continue with Google
-          </button>
+              <button
+                data-testid="button-google-login"
+                onClick={handleGoogle}
+                disabled={googleLoading}
+                className="w-full flex items-center justify-center gap-3 border border-border rounded-xl py-2.5 px-4 text-sm font-medium hover:bg-muted transition-colors disabled:opacity-60"
+              >
+                {googleLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FcGoogle className="w-5 h-5" />
+                )}
+                Continue with Google
+              </button>
+            </>
+          )}
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-4">
